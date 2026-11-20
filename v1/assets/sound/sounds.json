@@ -1,0 +1,528 @@
+{
+ "sounds": [
+  {
+   "name": "engine_idle",
+   "use": "idle",
+   "rpm": 830,
+   "describe": "Continuous steady idle of a big naturally aspirated American V8 sports car engine, already running, deep lumpy burble at constant speed, recorded close to the exhaust, no start-up, no revving, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_idle.mp3"
+  },
+  {
+   "name": "engine_2500",
+   "use": "engine",
+   "rpm": 2240,
+   "describe": "Continuous steady drone of a big naturally aspirated American V8 sports car engine already running at a constant 2500 rpm under light load, deep even growl that does not change, recorded close to the exhaust, no start-up, no revving, no gear changes, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_2500.mp3"
+  },
+  {
+   "name": "engine_4500",
+   "use": "engine",
+   "rpm": 3300,
+   "describe": "Continuous steady roar of a big naturally aspirated American V8 racing engine already running flat out at a constant high speed, loud hard-edged even roar whose pitch never changes, recorded close to the exhaust, no start-up, no revving up or down, no gear changes, no lift-off, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_4500.mp3"
+  },
+  {
+   "name": "engine_high",
+   "use": "spare",
+   "rpm": 6500,
+   "describe": "Continuous steady piercing high-pitched howl of a naturally aspirated V8 race car engine held flat out at maximum revs, an octave higher than an ordinary engine roar, a thin screaming wail like a racing motorcycle at top speed, pitch never changes, no start-up, no revving up or down, no gear changes, no lift-off, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played. An attempt at a high-revving loop; it came out as a whine near 1,200 Hz that is not clearly this engine. Kept to be listened to.",
+   "file": "assets/sound/engine_high.mp3"
+  },
+  {
+   "name": "tyres",
+   "use": "tyres",
+   "describe": "Car tyres squealing continuously on dry asphalt in a long hard corner, sustained high-pitched rubber screech, steady, no engine sound, no start or stop",
+   "seconds": 6,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/tyres.mp3"
+  },
+  {
+   "name": "wind",
+   "use": "wind",
+   "describe": "Wind rushing past an open car at high speed, steady airy roar, constant, no engine, no gusts",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.5,
+   "file": "assets/sound/wind.mp3"
+  },
+  {
+   "name": "road",
+   "use": "road",
+   "describe": "Low steady rumble of tyres rolling fast on smooth asphalt heard from inside a car, constant, no engine, no bumps",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.5,
+   "file": "assets/sound/road.mp3"
+  },
+  {
+   "name": "grass",
+   "use": "grass",
+   "describe": "A car driving over rough grass and dirt, tyres thudding and rustling through turf, steady, no engine",
+   "seconds": 6,
+   "loop": true,
+   "follows": 0.5,
+   "file": "assets/sound/grass.mp3"
+  },
+  {
+   "name": "start_light",
+   "use": "light",
+   "describe": "One single short electronic beep, a clean mid-pitched tone as a red start light comes on at a motor race, dry, no echo, nothing before or after it, no other sounds",
+   "seconds": 0.5,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/start_light.mp3"
+  },
+  {
+   "name": "lap",
+   "use": "lap",
+   "describe": "A short bright two-note rising electronic chime, the timing beacon as a racing car crosses the line to complete a lap, clean, dry, no other sounds",
+   "seconds": 1,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/lap.mp3"
+  },
+  {
+   "name": "menu_move",
+   "use": "menu",
+   "describe": "One single soft short click, a quiet tick of a control in a menu, low and dry, no echo, no other sounds",
+   "seconds": 0.5,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/menu_move.mp3"
+  },
+  {
+   "name": "menu_music",
+   "use": "music",
+   "describe": "Calm steady instrumental electronic music for the menu of a racing game, mid tempo, warm synthesiser pads over a light pulsing bass, unhurried and confident, no vocals, no drums fill, no ending, the same throughout",
+   "seconds": 22,
+   "loop": true,
+   "follows": 0.4,
+   "file": "assets/sound/menu_music.mp3"
+  },
+  {
+   "name": "engine_load_1300",
+   "use": "spare",
+   "rpm": 2200,
+   "describe": "A big naturally aspirated American V8 sports car engine pulling hard under full load at very low revs, about 1300 rpm in a high gear with the accelerator flat, lugging, slow heavy deep throbbing exhaust beats, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: its strongest note moves between the halves of the recording, and engine_load_4500 covers the same speeds.",
+   "file": "assets/sound/engine_load_1300.mp3"
+  },
+  {
+   "name": "engine_load_2000",
+   "use": "spare",
+   "rpm": 2382,
+   "describe": "A big naturally aspirated American V8 sports car engine pulling hard under full load at low revs, about 2000 rpm uphill in a high gear with the accelerator flat, deep hard-edged growl with a strong exhaust beat, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: engine_load_4500 covers the same speeds with a clearer note.",
+   "file": "assets/sound/engine_load_2000.mp3"
+  },
+  {
+   "name": "engine_load_3000",
+   "use": "spare",
+   "rpm": 2120,
+   "describe": "A big naturally aspirated American V8 sports car engine at wide open throttle under full load, held at a constant 3000 rpm on a dynamometer, loud deep muscular bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: engine_load_4500 covers nearly the same speeds with a clearer note. It would bring the gap above idle down to 1,037 to 1,590 rpm.",
+   "file": "assets/sound/engine_load_3000.mp3"
+  },
+  {
+   "name": "engine_load_4500",
+   "use": "load",
+   "rpm": 2322,
+   "describe": "A big naturally aspirated American V8 sports car engine at wide open throttle under full load, held at a constant 4500 rpm on a dynamometer, loud hard rasping roar, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_load_4500.mp3"
+  },
+  {
+   "name": "engine_load_6000",
+   "use": "load",
+   "rpm": 3371,
+   "describe": "A big naturally aspirated American V8 sports car engine at wide open throttle under full load, held at a constant 6000 rpm on a dynamometer, fierce loud high-pitched hard-edged bellow, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_load_6000.mp3"
+  },
+  {
+   "name": "engine_load_red",
+   "use": "spare",
+   "rpm": 10396,
+   "describe": "A naturally aspirated American V8 racing car engine at wide open throttle under full load, held at its red line near 7000 rpm flat out on a long straight, the highest fiercest screaming roar a V8 makes, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: its strongest note is at 693 Hz with others near it at 545 and 624 Hz, so it has no clear speed and none within reach of the red line.",
+   "file": "assets/sound/engine_load_red.mp3"
+  },
+  {
+   "name": "engine_over_1500",
+   "use": "spare",
+   "rpm": 1797,
+   "describe": "A big naturally aspirated American V8 sports car engine on the overrun at low revs, about 1500 rpm, a soft deep rumble, throttle fully closed, the car coasting in gear with the engine braking it, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: several notes of nearly equal strength, and engine_over_low covers the same speeds.",
+   "file": "assets/sound/engine_over_1500.mp3"
+  },
+  {
+   "name": "engine_over_2500",
+   "use": "spare",
+   "rpm": 1696,
+   "describe": "A big naturally aspirated American V8 sports car engine on the overrun at about 2500 rpm, a deep gargling rumble, throttle fully closed, the car coasting in gear with the engine braking it, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: two notes of equal strength, and engine_over_low covers the same speeds.",
+   "file": "assets/sound/engine_over_2500.mp3"
+  },
+  {
+   "name": "engine_over_4000",
+   "use": "overrun",
+   "rpm": 2786,
+   "describe": "A big naturally aspirated American V8 sports car engine on the overrun at medium high revs, about 4000 rpm, a hollow droning gargle, throttle fully closed, the car coasting in gear with the engine braking it, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_over_4000.mp3"
+  },
+  {
+   "name": "engine_over_5500",
+   "use": "overrun",
+   "rpm": 3270,
+   "describe": "A big naturally aspirated American V8 sports car engine on the overrun at high revs, about 5500 rpm, a high hollow wailing gargle, throttle fully closed, the car coasting in gear with the engine braking it, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_over_5500.mp3"
+  },
+  {
+   "name": "engine_over_6500",
+   "use": "spare",
+   "rpm": 2200,
+   "describe": "A naturally aspirated V8 racing car engine on the overrun at its red line near 6500 rpm, a very high hollow rasping wail, throttle fully closed, the car coasting in gear with the engine braking it, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: asked for at the red line, it came back at 147 Hz; engine_over_high_c covers the same speeds.",
+   "file": "assets/sound/engine_over_6500.mp3"
+  },
+  {
+   "name": "tyre_howl",
+   "use": "howl",
+   "describe": "Car tyres at the very limit of grip in a long fast corner on dry asphalt, a low steady scrubbing howl, a moaning hum of rubber working hard but not yet sliding, lower and softer than a squeal, constant, no engine, no start or stop",
+   "seconds": 5,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/tyre_howl.mp3"
+  },
+  {
+   "name": "tyre_lock",
+   "use": "lock",
+   "describe": "Locked car tyres skidding in a straight line on dry asphalt under hard braking, a harsh rough continuous scraping skid, lower and rougher than a cornering squeal, steady, no engine, no start or stop",
+   "seconds": 5,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/tyre_lock.mp3"
+  },
+  {
+   "name": "tyre_slide",
+   "use": "slide",
+   "describe": "A car sliding broadside in a long drift on dry asphalt, tyres scrubbing sideways, a wide tearing wavering continuous screech, no engine, no start or stop",
+   "seconds": 5,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/tyre_slide.mp3"
+  },
+  {
+   "name": "tyre_spin",
+   "use": "spin",
+   "describe": "Rear tyres spinning fast under power on dry asphalt in a burnout, a continuous high whirring shriek of spinning rubber, steady, no engine sound, no start or stop",
+   "seconds": 5,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/tyre_spin.mp3"
+  },
+  {
+   "name": "kerb",
+   "use": "kerb",
+   "describe": "A car running along the ribbed kerb of a race track at speed, a rapid hard rhythmic thrumming buzz of tyres drumming over the ribs, steady, no engine, no start or stop",
+   "seconds": 6,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/kerb.mp3"
+  },
+  {
+   "name": "gravel",
+   "use": "gravel",
+   "describe": "A car ploughing through the deep gravel trap of a race track, tyres crunching and hissing through loose stones, a steady continuous heavy crunch, no engine, no start or stop",
+   "seconds": 6,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/gravel.mp3"
+  },
+  {
+   "name": "stones_1",
+   "use": "stones",
+   "describe": "A few small stones thrown up against the metal underside of a moving car, one short sharp rattle of pings and clacks, dry, nothing before or after, no other sounds",
+   "seconds": 0.7,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/stones_1.mp3"
+  },
+  {
+   "name": "stones_2",
+   "use": "stones",
+   "describe": "A spray of gravel hitting the inside of a car wheel arch, one short burst of hard ticks and a clatter, dry, nothing before or after, no other sounds",
+   "seconds": 0.9,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/stones_2.mp3"
+  },
+  {
+   "name": "hit_rail_tap",
+   "use": "hit",
+   "what": "rail",
+   "weight": "tap",
+   "describe": "A car lightly tapping a steel crash barrier, one short light metallic clank with a brief ring of the rail, dry, nothing before or after",
+   "seconds": 0.7,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_rail_tap.mp3"
+  },
+  {
+   "name": "hit_rail_heavy",
+   "use": "hit",
+   "what": "rail",
+   "weight": "heavy",
+   "describe": "A car crashing hard into a steel crash barrier, one heavy metallic bang and crunch of bodywork with the steel rail ringing after it, nothing before it, no skid, no voices",
+   "seconds": 1.5,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_rail_heavy.mp3"
+  },
+  {
+   "name": "hit_tyres_tap",
+   "use": "hit",
+   "what": "tyres",
+   "weight": "tap",
+   "describe": "A car lightly bumping a wall of stacked rubber tyres, one short soft dull rubbery thud, dry, nothing before or after",
+   "seconds": 0.7,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_tyres_tap.mp3"
+  },
+  {
+   "name": "hit_tyres_heavy",
+   "use": "hit",
+   "what": "tyres",
+   "weight": "heavy",
+   "describe": "A car crashing hard into a tyre barrier, one heavy deep rubbery whump with tyres thumping and tumbling after it, nothing before it, no skid, no voices",
+   "seconds": 1.5,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_tyres_heavy.mp3"
+  },
+  {
+   "name": "hit_wall_tap",
+   "use": "hit",
+   "what": "wall",
+   "weight": "tap",
+   "describe": "A car lightly knocking a concrete wall, one short hard dry knock of bodywork on concrete, no ring, nothing before or after",
+   "seconds": 0.7,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_wall_tap.mp3"
+  },
+  {
+   "name": "hit_wall_heavy",
+   "use": "hit",
+   "what": "wall",
+   "weight": "heavy",
+   "describe": "A car crashing hard into a concrete wall, one heavy hard dead crunching smash of bodywork on concrete with debris scattering after it, nothing before it, no skid, no voices",
+   "seconds": 1.5,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_wall_heavy.mp3"
+  },
+  {
+   "name": "hit_car_tap",
+   "use": "hit",
+   "what": "car",
+   "weight": "tap",
+   "describe": "Two racing cars touching lightly, one short hollow knock of body panel on body panel, dry, nothing before or after",
+   "seconds": 0.7,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_car_tap.mp3"
+  },
+  {
+   "name": "hit_car_heavy",
+   "use": "hit",
+   "what": "car",
+   "weight": "heavy",
+   "describe": "Two racing cars colliding hard, one heavy hollow bang and crunch of body panels and breaking plastic, nothing before it, no skid, no voices",
+   "seconds": 1.5,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/hit_car_heavy.mp3"
+  },
+  {
+   "name": "scrape_rail",
+   "use": "scrape",
+   "what": "rail",
+   "describe": "A car scraping along a steel crash barrier at speed, continuous harsh grinding screech of metal on metal, steady, no engine, no impact, no start or stop",
+   "seconds": 4,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/scrape_rail.mp3"
+  },
+  {
+   "name": "scrape_wall",
+   "use": "scrape",
+   "what": "wall",
+   "describe": "A car scraping along a concrete wall at speed, continuous rough gritty grinding rasp of bodywork on concrete, steady, no engine, no impact, no start or stop",
+   "seconds": 4,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/scrape_wall.mp3"
+  },
+  {
+   "name": "scrape_tyres",
+   "use": "scrape",
+   "what": "tyres",
+   "describe": "A car rubbing along a wall of stacked rubber tyres at speed, continuous dull rubbery thudding and squeaking drag, steady, no engine, no impact, no start or stop",
+   "seconds": 4,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/scrape_tyres.mp3"
+  },
+  {
+   "name": "gear_change",
+   "use": "shift",
+   "describe": "One single fast gear change of a racing car sequential gearbox, a short sharp mechanical clack with a quick snap of air, dry, nothing before or after, no engine",
+   "seconds": 0.5,
+   "loop": false,
+   "follows": 0.6,
+   "file": "assets/sound/gear_change.mp3"
+  },
+  {
+   "name": "engine_load_low_a",
+   "use": "spare",
+   "rpm": 2160,
+   "describe": "A big naturally aspirated American V8 sports car engine pulling a heavy load very slowly, only a little faster than its idle, each deep slow lumpy exhaust beat heard apart, a very low bass rumble, accelerator pressed, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: asked for just above idle, it came back with its strongest note at 144 Hz, and that moves.",
+   "file": "assets/sound/engine_load_low_a.mp3"
+  },
+  {
+   "name": "engine_load_low_b",
+   "use": "spare",
+   "rpm": 1958,
+   "describe": "A big naturally aspirated American V8 muscle car pulling away slowly under load at low revs, a slow deep loping thudding exhaust, twice as fast as idle, very low in pitch, accelerator pressed, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: several notes of nearly equal strength between 100 and 150 Hz, so the label is unsure. It would bring the gap above idle down to 1,037 to 1,468 rpm.",
+   "file": "assets/sound/engine_load_low_b.mp3"
+  },
+  {
+   "name": "engine_load_high_a",
+   "use": "spare",
+   "rpm": 3291,
+   "describe": "A naturally aspirated V8 racing car engine at full throttle under load at high revs, a high hard tenor howl, clearly higher in pitch than a deep roar but not yet a scream, accelerating hard up a long hill, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: engine_load_6000 covers the same speeds with a clearer note.",
+   "file": "assets/sound/engine_load_high_a.mp3"
+  },
+  {
+   "name": "engine_load_high_b",
+   "use": "load",
+   "rpm": 4017,
+   "describe": "A naturally aspirated V8 racing car engine at full throttle under load near maximum revs, a high-pitched screaming howl, nearly an octave above an ordinary engine roar, flat out on a long straight, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_load_high_b.mp3"
+  },
+  {
+   "name": "engine_load_high_c",
+   "use": "load",
+   "rpm": 4966,
+   "describe": "A naturally aspirated V8 race car engine held flat out at maximum revs under full load, a piercing high-pitched scream an octave higher than an ordinary engine roar, a hard wail like a racing motorcycle at top speed, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_load_high_c.mp3"
+  },
+  {
+   "name": "engine_over_low",
+   "use": "overrun",
+   "rpm": 1595,
+   "describe": "A big American V8 sports car engine on the overrun only a little faster than its idle, each deep slow lumpy exhaust beat heard apart, a very low soft bass rumble, throttle fully closed, engine braking, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_over_low.mp3"
+  },
+  {
+   "name": "engine_over_high_a",
+   "use": "spare",
+   "rpm": 2120,
+   "describe": "A naturally aspirated V8 racing car engine on the overrun at high revs, a high hollow tenor moan, clearly higher in pitch than a deep rumble but not a scream, throttle fully closed, engine braking, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: asked for at high revs, it came back at 141 Hz; engine_over_high_c covers the same speeds.",
+   "file": "assets/sound/engine_over_high_a.mp3"
+  },
+  {
+   "name": "engine_over_high_b",
+   "use": "spare",
+   "rpm": 2221,
+   "describe": "A naturally aspirated V8 racing car engine on the overrun near maximum revs, a high-pitched hollow wail nearly an octave above an ordinary engine drone, throttle fully closed, engine braking, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "note": "Not played: asked for near maximum revs, it came back at 148 Hz; engine_over_high_c covers the same speeds.",
+   "file": "assets/sound/engine_over_high_b.mp3"
+  },
+  {
+   "name": "engine_over_high_c",
+   "use": "overrun",
+   "rpm": 2180,
+   "describe": "A V8 race car engine on the overrun from maximum revs, a piercing high hollow whine an octave above an ordinary engine drone, like a racing motorcycle slowing, throttle fully closed, engine braking, hollow burbling and soft irregular pops from the exhaust, no bark, constant speed and pitch that never changes, recorded behind the car close to the exhaust, no gear changes, no revving up or down, no tyre noise, no wind, no other sounds",
+   "seconds": 8,
+   "loop": true,
+   "follows": 0.6,
+   "file": "assets/sound/engine_over_high_c.mp3"
+  }
+ ]
+}

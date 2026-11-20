@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Tachyon Sprint</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* Sizes follow the window (its height, or its width when it is narrow), so
+   the display reads the same at 1280 by 720 as in full screen. */
+:root{--u:clamp(8px,min(1.95vh,1.25vw),26px);--ink:#f4f6f8;--dim:#aab3bf;--panel:rgba(9,12,17,.78);--edge:rgba(255,255,255,.14);
+  --red:#ff3b30;--green:#32e08a;--amber:#ffc83d;--violet:#c58bff;--blue:#4db8ff}
+html,body{margin:0;height:100%;background:#0b0d10;color:var(--ink);overflow:hidden;
+  font:500 var(--u)/1.25 "Avenir Next Condensed","DIN Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;user-select:none}
+#wrap{position:fixed;inset:0}
+canvas{width:100%;height:100%;display:block;outline:none}
+[hidden]{display:none!important}
+
+/* ------------------------------------------------------------ display */
+#hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .25s}
+body.driving #hud{opacity:1}
+html.clean #hud{display:none}
+.block{position:absolute;background:var(--panel);border:1px solid var(--edge);border-radius:.35em;
+  box-shadow:0 .2em 1.2em rgba(0,0,0,.35)}
+.tag{font-size:.72em;font-weight:600;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.big{font-weight:700;font-style:italic;line-height:.9}
+
+#standing{left:1.6em;top:1.4em;display:flex;align-items:stretch;overflow:hidden}
+#standing>div{padding:.55em 1.1em .6em;display:flex;flex-direction:column;justify-content:center}
+#standing>div+div{border-left:1px solid var(--edge)}
+#standing .big{font-size:2.9em}
+#standing small{font-size:.42em;font-style:normal;font-weight:600;color:var(--dim);margin-left:.12em}
+body[data-mode=trial] .race-only{display:none!important}
+body[data-mode=race] .trial-only{display:none!important}
+#place-box{background:var(--red);color:#fff}
+#place-box .tag,#place-box small{color:rgba(255,255,255,.85)}
+#trial-box .big{font-size:1.5em;font-style:normal;letter-spacing:.06em}
+#target{font-weight:700;font-size:1.15em}
+#target[data-kind=gold],.medal.gold{color:#ffd24a}#target[data-kind=silver],.medal.silver{color:#d5dde6}#target[data-kind=bronze],.medal.bronze{color:#e39a5c}
+#ghost{font-size:.72em;letter-spacing:.12em;color:var(--blue);font-weight:600}
+
+/* The order of the field (H10): a row a car, drawn straight on the picture
+   as the references' towers are; each row is moved to its place, so cars
+   are seen to change places. Under it the gaps on the road (H4). */
+#order{position:absolute;left:1.6em;top:7.1em;width:16.4em}
+#tower{position:relative;font-size:.95em;--row:1.74em}
+#tower .car{position:absolute;left:0;right:0;top:0;height:1.6em;display:flex;align-items:center;font-weight:600;
+  background:linear-gradient(90deg,rgba(9,12,17,.9),rgba(9,12,17,.66));transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+#tower .car b{flex:none;width:1.75em;align-self:stretch;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-style:italic;background:rgba(255,255,255,.1)}
+#tower .car i{flex:none;width:.3em;align-self:stretch;background:var(--c)}
+#tower .car u{flex:none;width:1.9em;text-align:right;text-decoration:none;font-size:.8em;font-weight:700;color:var(--dim)}
+#tower .car span{flex:1;padding-left:.5em;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+#tower .car em{flex:none;padding-right:.6em;font-style:normal;font-size:.92em;font-variant-numeric:tabular-nums;color:#dfe5ec}
+#tower .car em[data-kind=word]{font-size:.7em;letter-spacing:.14em;color:var(--dim)}
+#tower .car.you{background:#f4f6f8;color:#0b0d10;z-index:1}
+#tower .car.you b{background:var(--red);color:#fff}#tower .car.you u{color:#4a525e}#tower .car.you em{color:#0b0d10}
+#tower .car[data-state=out] span,#tower .car[data-state=out] u{opacity:.5}
+#tower .car[data-state=finished] em::before{content:"";display:inline-block;width:.8em;height:.8em;margin-right:.4em;vertical-align:-.08em;
+  background:conic-gradient(#fff 25%,#111 0 50%,#fff 0 75%,#111 0) 0 0/.4em .4em}
+#gaps{display:flex;gap:.4em;margin-top:.45em}
+#gaps>div{flex:1;display:flex;align-items:baseline;justify-content:space-between;gap:.4em;padding:.28em .6em .3em;white-space:nowrap;
+  background:linear-gradient(90deg,rgba(9,12,17,.9),rgba(9,12,17,.66))}
+#gaps>div:has([data-kind=none]){visibility:hidden}
+#gaps .tag{font-size:.74em;letter-spacing:.1em}
+#gap-ahead,#gap-behind{font-weight:700;font-size:1.2em;font-variant-numeric:tabular-nums}
+#gap-ahead{color:var(--amber)}#gap-behind{color:var(--green)}
+#pen-row span:last-child{color:var(--amber)}#pen-row[hidden]{display:none}
+#pen-why{margin-left:.3em;font-style:normal;letter-spacing:.04em;text-transform:none;color:var(--amber);white-space:nowrap}
+
+#timing{right:1.6em;top:1.4em;padding:.6em 1.1em .7em;min-width:13.5em}
+#timing .row{display:flex;justify-content:space-between;align-items:baseline;gap:1.4em}
+#timing .row span:last-child{font-weight:700;font-size:1.25em}
+#timing .now span:last-child{font-size:2.05em;font-style:italic}
+#delta{display:block;margin:.35em 0 .1em;padding:.12em .6em;border-radius:.25em;text-align:right;font-weight:700;font-size:1.45em}
+#delta[data-kind=none]{display:none}
+#delta[data-kind=ahead]{background:rgba(50,224,138,.18);color:var(--green)}
+#delta[data-kind=behind]{background:rgba(255,59,48,.2);color:#ff7168}
+#delta[data-kind=level]{background:rgba(255,255,255,.1)}
+#sectors{display:flex;gap:.3em;margin-top:.5em}
+#sectors div{flex:1;text-align:center;padding:.18em 0 .22em;border-radius:.2em;background:rgba(255,255,255,.07);border-bottom:.18em solid transparent}
+#sectors b{display:block;font-size:.62em;letter-spacing:.14em;color:var(--dim);font-weight:600}
+#sectors span{font-weight:700;font-size:.95em}
+#sectors span[data-kind=best]{color:var(--violet)}#sectors div:has(span[data-kind=best]){border-color:var(--violet)}
+#sectors span[data-kind=slower]{color:var(--amber)}#sectors div:has(span[data-kind=slower]){border-color:var(--amber)}
+#sectors div:has(span[data-kind=now]){border-color:var(--ink)}
+#sectors div.last-lap{opacity:.7}
+
+#dash{right:1.6em;bottom:1.5em;padding:.7em 1.1em .8em;width:17em}
+#leds{display:flex;gap:.22em;margin-bottom:.55em}
+#leds i{flex:1;height:.55em;border-radius:.14em;background:rgba(255,255,255,.12)}
+#leds i.low{background:var(--green);box-shadow:0 0 .5em var(--green)}
+#leds i.mid{background:var(--amber);box-shadow:0 0 .5em var(--amber)}
+#leds i.high{background:var(--red);box-shadow:0 0 .5em var(--red)}
+#leds i.change{background:var(--blue);box-shadow:0 0 .7em var(--blue)}
+#dial{display:flex;align-items:flex-end;justify-content:space-between}
+#gear-box{width:3.3em;height:3.6em;border:.14em solid var(--ink);border-radius:.4em;display:flex;align-items:center;justify-content:center}
+#gear{font-size:3em}
+#speed{font-size:4.6em;text-align:right;min-width:2.2em}
+#speed-box{text-align:right}
+#revs{position:relative;height:.5em;margin-top:.6em;border-radius:.25em;background:rgba(255,255,255,.12);overflow:hidden}
+#revs-fill{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#e9eef4,#fff)}
+#revs-red{position:absolute;top:0;bottom:0;right:0;background:rgba(255,59,48,.55);mix-blend-mode:screen}
+#revs-row{display:flex;justify-content:space-between;margin-top:.25em}
+
+#map{left:1.6em;bottom:1.5em;width:11.5em;height:11.5em;padding:.5em;background:rgba(8,10,14,.5)}
+#map svg{width:100%;height:100%;overflow:visible}
+#map-road{fill:none;stroke:rgba(255,255,255,.92);stroke-width:2.6;stroke-linejoin:round;stroke-linecap:round}
+#map-line{fill:none;stroke:#fff;stroke-width:5;stroke-linecap:butt}
+#map-me{fill:var(--red);stroke:#fff;stroke-width:1.2}
+#map-cars circle{stroke:rgba(0,0,0,.75);stroke-width:.8}
+#map-other{fill:var(--blue);stroke:#fff;stroke-width:1}
+#map-other[data-kind=none]{display:none}
+#map-other[data-kind=ghost]{fill:rgba(160,220,255,.6)}
+body.readout #map{display:none}
+#top{position:absolute;left:50%;top:1.4em;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.6em}
+#lights{display:flex;gap:.55em;padding:.55em .7em;background:#06080b;border:1px solid var(--edge);border-radius:.5em}
+#lights[data-on=no]{display:none}
+#lights i{width:2.1em;height:2.1em;border-radius:50%;background:#2a0b0a;box-shadow:inset 0 0 .5em #000}
+#lights i.lit{background:radial-gradient(circle at 40% 35%,#ff9a8f,var(--red) 55%,#b01208);box-shadow:0 0 1.4em rgba(255,59,48,.9)}
+.message{padding:.3em 1.2em .34em;font-weight:700;font-size:1.5em;letter-spacing:.06em;white-space:nowrap;
+  background:var(--panel);border:1px solid var(--edge);border-radius:.3em;animation:arrive .18s ease-out}
+.message.best{color:var(--violet);border-color:var(--violet)}.message.note{color:var(--amber)}
+.message.warn{color:#ff7168;border-color:var(--red)}.message.flag{background:#fff;color:#0b0d10;font-size:2em}
+@keyframes arrive{from{opacity:0;transform:translateY(-.4em)}}
+#wrong{padding:.3em 1.4em;font-weight:700;font-size:2.2em;letter-spacing:.1em;background:var(--red);color:#fff;border-radius:.3em}
+/* A way back, offered to a car that is stuck or turned round (D11). */
+#wayback{position:absolute;left:50%;top:31%;transform:translateX(-50%);display:flex;align-items:center;gap:1em;padding:.5em 1.1em .55em;
+  white-space:nowrap;font-weight:700;font-size:1.45em;letter-spacing:.08em;text-transform:uppercase;background:var(--panel);
+  border:1px solid var(--edge);border-left:.24em solid var(--amber);border-radius:.3em;animation:offered .2s ease-out}
+#wayback kbd{display:inline-block;min-width:1.1em;margin-right:.2em;padding:.04em .42em .08em;font:inherit;letter-spacing:.02em;text-align:center;
+  color:#0b0d10;background:#fff;border-radius:.22em;box-shadow:0 .14em 0 rgba(0,0,0,.5)}
+#way-reverse{padding-left:1em;border-left:1px solid var(--edge);color:#d3d9e0}
+@keyframes offered{from{opacity:0}}
+/* What the car has struck (D13): a plan of it, nose up, a mark a hit. */
+#damage{right:21.2em;bottom:1.5em;padding:.5em .7em .55em;display:flex;flex-direction:column;align-items:center;gap:.3em}
+#damage svg{width:4.8em;height:9.6em;display:block;overflow:visible}
+#damage-car{fill:rgba(255,255,255,.16);stroke:rgba(255,255,255,.85);stroke-width:.07}
+#damage-svg .glass{fill:rgba(255,255,255,.2)}#damage-svg .tyre{fill:rgba(255,255,255,.75)}
+#damage-svg .wing{fill:none;stroke:rgba(255,255,255,.85);stroke-width:.12;stroke-linecap:round}
+#damage-marks circle{fill-opacity:.8;stroke:rgba(0,0,0,.6);stroke-width:.04}
+#damage-marks circle[data-heavy=true]{stroke:#fff;stroke-width:.07}
+#worn{color:#ff7168;letter-spacing:.1em}#worn:empty{display:none}
+html.clean #wayback,html.clean #damage{display:none}
+#pause-button{position:absolute;left:50%;bottom:1.5em;transform:translateX(-50%);pointer-events:auto;cursor:pointer;
+  padding:.3em .9em;font:inherit;font-size:.8em;font-weight:600;letter-spacing:.14em;color:var(--dim);background:var(--panel);
+  border:1px solid var(--edge);border-radius:.3em}
+#pause-button{opacity:0;transition:opacity .2s}body.pointing #pause-button,#pause-button:hover{opacity:1}
+#pause-button:hover{color:#0b0d10;background:#fff}
+body:not([data-screen=drive]) #pause-button{display:none}
+#notice{position:fixed;left:50%;top:1.4em;transform:translateX(-50%);padding:.35em 1.2em;font-weight:700;letter-spacing:.1em;
+  color:var(--amber);background:var(--panel);border:1px solid var(--edge);border-radius:.3em;z-index:3}
+#readout{display:none;position:absolute;left:1.6em;bottom:1.5em;padding:.5em .8em;font:11px/1.5 ui-monospace,Menlo,monospace;white-space:pre;background:var(--panel);border-radius:.3em}
+body.readout #readout{display:block}
+
+/* -------------------------------------------------------------- menus */
+#menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:flex-start;padding-left:9vw;
+  background:linear-gradient(90deg,rgba(6,8,11,.9) 0,rgba(6,8,11,.72) 34em,rgba(6,8,11,0) 62em)}
+body[data-screen=pause] #menu,body[data-screen=result] #menu{justify-content:center;padding:0;background:rgba(6,8,11,.66)}
+.card{width:min(30em,84vw);max-height:92vh;display:flex;flex-direction:column}
+body[data-screen=result] .card{width:min(40em,90vw)}
+.card h1{margin:0;font-size:3.3em;font-style:italic;font-weight:800;letter-spacing:.02em;line-height:1}
+.card h1::after{content:"";display:block;width:2.2em;height:.12em;background:var(--red);margin:.28em 0 .3em}
+.lead{margin:0 0 1.2em;color:var(--dim);font-size:1.15em}
+.body p{margin:.2em 0 .8em;color:#d3d9e0;line-height:1.4}
+.facts{display:flex;flex-wrap:wrap;gap:.5em 1.6em}.facts b{color:#fff;font-size:1.2em;margin-left:.3em}
+.medal i{display:inline-block;width:.7em;height:.7em;border-radius:50%;background:currentColor;margin-right:.4em}
+em.medal{font-style:normal;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-left:.8em}
+.card ul{list-style:none;margin:.4em 0 0;padding:0 .4em 0 0;overflow-y:auto}
+.heading{margin:.9em 0 .25em;font-size:.72em;font-weight:600;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.item{display:flex;justify-content:space-between;align-items:center;gap:1em;padding:.42em .9em;margin:.16em 0;cursor:pointer;
+  font-size:1.3em;font-weight:600;border-left:.22em solid transparent;border-radius:.2em;background:rgba(255,255,255,.05)}
+.item.on{background:#fff;color:#0b0d10;border-left-color:var(--red)}
+.value{display:flex;align-items:center;gap:.5em;font-weight:500;white-space:nowrap}
+.value b{font-weight:700;padding:0 .35em;opacity:.55}.item.on .value b{opacity:1}
+.hint{margin:1.1em 0 0;font-size:.8em;color:var(--dim);letter-spacing:.06em}
+.for-pad{display:none}body.pad .for-pad{display:inline}body.pad .for-keys{display:none}
+#result{width:100%;border-collapse:collapse;margin:.3em 0 .8em;font-size:1.05em}
+#result th{text-align:right;font-size:.6em;font-weight:600;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;padding:.3em .7em}
+#result td{text-align:right;padding:.3em .7em;font-weight:600;border-top:1px solid var(--edge);font-variant-numeric:tabular-nums;white-space:nowrap}
+#result td i{display:inline-block;min-width:1.7em;margin-right:.6em;padding:0 .2em;font-style:normal;font-size:.8em;text-align:center;
+  border-left:.3em solid var(--c);background:rgba(255,255,255,.1)}
+#result td small{color:var(--dim);font-weight:500}
+#result td:nth-child(2){text-align:left}#result td:first-child{font-style:italic;font-weight:800;font-size:1.3em;width:1.5em}
+#result tr.you td{background:rgba(255,255,255,.1)}
+#note{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.3em;color:var(--dim);background:#0b0d10}
+body:not([data-screen=loading]) #note{display:none}
+#note .loading{display:grid;gap:.6em;justify-items:center;letter-spacing:.06em}#note .bar{width:22em;height:.3em;background:#22272e}#note .bar i{display:block;height:100%;background:var(--red,#e10600)}
+.near{position:fixed;top:42%;width:14px;height:16%;pointer-events:none;opacity:0;transition:opacity .15s}
+.near[data-side="left"]{left:0;background:linear-gradient(90deg,rgba(255,190,40,.9),rgba(255,190,40,0))}
+.near[data-side="right"]{right:0;background:linear-gradient(270deg,rgba(255,190,40,.9),rgba(255,190,40,0))}
+.near[data-kind="close"]{opacity:.55}
+.near[data-kind="level"]{opacity:1;filter:hue-rotate(-30deg) saturate(1.6)}
+body:not(.driving) .near,.clean .near{display:none}
+#firstrun{position:fixed;right:1.6em;top:16.5em;background:rgba(10,12,16,.82);color:#fff;
+  padding:.8em 1.2em;border-left:4px solid #e8402a;font-weight:600;font-size:.82em;line-height:1.7;letter-spacing:.06em;max-width:19em;text-align:left}
+#firstrun span{display:block}#firstrun span i{font-style:normal;white-space:nowrap;display:block}
+#firstrun b{display:block;font-size:15px;letter-spacing:.12em;text-transform:uppercase}
+#firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
+.clean #firstrun{display:none}
+</style>
+</head><body data-screen="loading" data-mode="demo">
+<div id="wrap"><canvas id="car"></canvas></div>
+
+<div id="hud">
+  <div id="standing" class="block">
+    <div id="place-box" class="race-only"><span class="tag">Place</span><span class="big"><span id="place"></span><small id="of"></small></span></div>
+    <div id="trial-box" class="trial-only"><span class="tag">Time trial</span><span id="target" data-kind="none"></span><span id="ghost"></span></div>
+    <div><span class="tag">Lap</span><span class="big"><span id="lap"></span><small id="laps"></small></span></div>
+  </div>
+  <div id="order" class="race-only">
+    <div id="tower"></div>
+    <div id="gaps"><div><span class="tag">Ahead</span><span id="gap-ahead" data-kind="none"></span></div><div><span class="tag">Behind</span><span id="gap-behind" data-kind="none"></span></div></div>
+  </div>
+  <div id="top">
+    <div id="lights" data-on="no"></div>
+    <div id="wrong" hidden>WRONG WAY</div>
+    <div id="messages"></div>
+  </div>
+  <div id="timing" class="block">
+    <div class="row now"><span class="tag">Time</span><span id="time"></span></div>
+    <span id="delta" data-kind="none"></span>
+    <div class="row"><span class="tag">Last</span><span id="last"></span></div>
+    <div class="row"><span class="tag">Best</span><span id="best"></span></div>
+    <div class="row race-only" id="pen-row" hidden><span class="tag">Penalty <em id="pen-why"></em></span><span id="pen"></span></div>
+    <div id="sectors"><div><b>S1</b><span id="s1"></span></div><div><b>S2</b><span id="s2"></span></div><div><b>S3</b><span id="s3"></span></div></div>
+  </div>
+  <div id="dash" class="block">
+    <div id="leds"></div>
+    <div id="dial">
+      <div><div id="gear-box"><span id="gear" class="big"></span></div><span class="tag">Gear</span></div>
+      <div id="speed-box"><div id="speed" class="big"></div><span class="tag" id="unit"></span></div>
+    </div>
+    <div id="revs"><div id="revs-fill"></div><div id="revs-red"></div></div>
+    <div id="revs-row"><span class="tag">Revs × 1000</span><span class="tag" id="rpm"></span></div>
+  </div>
+  <div id="map" class="block"><svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"><path id="map-road"/><path id="map-line"/><g id="map-cars"></g><circle id="map-other" r="3.4"/><circle id="map-me" r="3.8"/></svg></div>
+  <div id="wayback" hidden><span id="way-back"><kbd id="way-key">R</kbd> back on the road</span><span id="way-reverse">hold <kbd id="way-brake">S</kbd> to reverse</span></div>
+  <div id="damage" class="block" hidden>
+    <span class="tag">Damage</span>
+    <svg id="damage-svg" viewBox="-1.4 -2.85 2.8 5.6" preserveAspectRatio="xMidYMid meet">
+      <rect class="tyre" x="-1.12" y="-1.87" width=".3" height=".76" rx=".08"/><rect class="tyre" x=".82" y="-1.87" width=".3" height=".76" rx=".08"/>
+      <rect class="tyre" x="-1.13" y=".93" width=".32" height=".78" rx=".08"/><rect class="tyre" x=".81" y=".93" width=".32" height=".78" rx=".08"/>
+      <path id="damage-car" d="M-.62-2.35h1.24q.36 0 .36.5v3.6q0 .5-.3.5h-1.36q-.3 0-.3-.5v-3.6q0-.5.36-.5z"/>
+      <path class="glass" d="M-.6-.75q.6-.3 1.2 0l-.12.7h-.96zM-.55.95h1.1l.1.5q-.65.22-1.3 0z"/>
+      <path class="wing" d="M-.95 2.42h1.9"/>
+      <g id="damage-marks"></g>
+    </svg>
+    <span class="tag" id="worn"></span>
+  </div>
+  <button id="pause-button">PAUSE <span class="for-keys">· ESC</span><span class="for-pad">· START</span></button>
+  <div id="readout"></div>
+</div>
+<div id="notice" hidden></div>
+<div id="near-left" class="near" data-side="left" data-kind="none"></div>
+<div id="near-right" class="near" data-side="right" data-kind="none"></div>
+<div id="firstrun" hidden></div>
+
+<div id="menu" hidden></div>
+<div id="note">Loading…</div>
+
+<script type="module">
+const note = document.getElementById('note');
+const log = console.log, info = console.info;
+const seen = (...a) => { const m = a.join(' ').match(/frame_ms ([0-9.]+)/); if (m) window.frameMs = +m[1]; };
+console.log = (...a) => { seen(...a); log(...a); }; console.info = (...a) => { seen(...a); info(...a); };
+const failed = why => { window.lastError = String(why); note.textContent = String(why); document.body.dataset.screen = 'loading'; };
+window.addEventListener('error', e => { window.lastError = String(e.message); });
+import './sound.js';
+import './game.js';
+import init from './car.js';
+if (!navigator.gpu) failed('This browser has no WebGPU, which the game is drawn with.');
+else init().catch(e => { if (!String(e).includes('Using exceptions for control flow')) failed(e); });
+</script></body></html>
