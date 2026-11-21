@@ -2,6 +2,7 @@
 // display over the picture. The simulation owns the race (`sim/src/race.rs`);
 // this asks it for things and shows what it says.
 //
+import './voice-control.js';
 // The game calls four functions of this page every frame or when needed:
 //   gamePoll()        what is asked: a line of controls, then commands
 //   gameState(json)   the race now
@@ -24,7 +25,7 @@ const ACTIONS = {
 };
 const DEFAULTS = {
   level: 3, rivals: 'match', laps: 3, abs: true, tc: 'high', stability: true, gears: 'auto', line: 'corners', damage: 'full', view: 0,
-  master: 8, car: 10, effects: 8, music: 6, units: 'km/h', readout: false,
+  master: 8, car: 10, effects: 8, music: 6, units: 'km/h', readout: false, spotter: true,
   keys: {
     throttle: ['KeyW', 'ArrowUp'], brake: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'],
     right: ['KeyD', 'ArrowRight'], handbrake: ['Space'], up: ['KeyE'], down: ['KeyQ'],
@@ -39,7 +40,7 @@ const DEFAULTS = {
   },
 };
 const BUTTONS = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'LS', 'RS', 'Up', 'Down', 'Left', 'Right', 'Home'];
-const VIEWS = ['Far chase', 'Near chase', 'Bonnet', 'Bumper'];
+const VIEWS = ['Far chase', 'Near chase', 'Bonnet', 'Bumper', 'Cockpit'];
 const store = {
   get(name) { try { return localStorage.getItem(`racing.${name}`); } catch { return null; } },
   set(name, value) { try { localStorage.setItem(`racing.${name}`, value); } catch { /* private window */ } },
@@ -71,7 +72,9 @@ function applySettings() {
   ask(`line ${{ off: 0, corners: 1, full: 2 }[settings.line] ?? 1}`);
   // Whether a hard blow slows the car (D13), or leaves its mark only.
   ask(`damage ${+(settings.damage !== 'marks')}`);
-  ask(`view ${settings.view}`);
+  // View 4 is Cockpit: simulation engine uses Bonnet (view 2) as base camera
+  ask(`view ${settings.view === 4 ? 2 : settings.view}`);
+  document.body.classList.toggle('view-cockpit', settings.view === 4);
   window.soundSet?.({
     master: settings.master / 10, car: settings.car / 10,
     effects: settings.effects / 10, music: settings.music / 10,
@@ -83,12 +86,152 @@ function applySettings() {
 
 const asked = [];
 const ask = command => asked.push(command);
+let autoRecoverTimer = null;
 const game = window.game = {
   state: null, screen: 'loading', settings, held: new Set(), pad: null,
   messages: [], started: 0, ask,
+  setCruise(active) {
+    const target = active !== undefined ? !!active : !game.state?.auto;
+    ask(`auto ${target ? 1 : 0}`);
+    notice(target ? 'CRUISE MODE ACTIVE' : 'MANUAL CONTROL');
+    if (window.soundPlay) window.soundPlay('menu');
+    spotterRadio(target ? 'Cruise mode active, vehicle under autopilot' : 'Manual control resumed', 2000);
+  },
+  act(name, payload) {
+    if (name === 'cruise') {
+      game.setCruise(true);
+    } else if (name === 'drive' || name === 'manual') {
+      game.setCruise(false);
+    } else if (name === 'back' || name === 'recover') {
+      if (game.screen === 'drive') {
+        ask('back');
+        notice('BACK ON THE ROAD');
+      }
+    } else if (name === 'mute') {
+      window.soundMute?.();
+      notice('SOUND TOGGLED');
+    } else if (name === 'fullscreen') {
+      fullscreen();
+    } else if (name === 'menu' || name === 'exit') {
+      if (game.screen === 'drive' || game.screen === 'pause' || game.screen === 'result') {
+        toMenu();
+      }
+    } else if (name === 'pause') {
+      if (game.screen === 'drive') pause();
+    } else if (name === 'resume') {
+      if (game.screen === 'pause') resume();
+    } else if (name === 'start') {
+      if (game.screen === 'title') show('race');
+      else if (game.screen === 'race') startRace();
+      else if (game.screen === 'trial') startTrial();
+      else if (game.screen === 'pause') resume();
+      else if (game.screen === 'result') again();
+    } else if (name === 'restart' || name === 'again') {
+      if (game.mode === 'race' || game.mode === 'trial' || game.screen === 'result') again();
+    } else if (name === 'view') {
+      if (payload != null && payload >= 0 && payload < VIEWS.length) {
+        settings.view = payload;
+        saveSettings();
+        notice(`CAMERA: ${VIEWS[payload].toUpperCase()}`);
+      } else {
+        act('view');
+        notice(`CAMERA: ${VIEWS[settings.view].toUpperCase()}`);
+      }
+    }
+  }
 };
 
-const PLAYERS = ['clean', 'mistake', 'careless'];
+// ------------------------------------------------------------- Model Context Protocol (MCP) Bridge
+// Standardized tool interface for autonomous test agents and external copilots
+window.game.mcp = {
+  // Protocol Schema definition
+  getTools() {
+    return [
+      {
+        name: 'get_telemetry',
+        description: 'Read real-time vehicle speed, rpm, gear, inputs, lap timings, and field position',
+        parameters: {}
+      },
+      {
+        name: 'set_driving_mode',
+        description: 'Set vehicle driving control mode between manual human driving and autopilot cruise',
+        parameters: { mode: { type: 'string', enum: ['cruise', 'manual'] } }
+      },
+      {
+        name: 'set_camera_view',
+        description: 'Switch engine camera perspective (far, near, bonnet, bumper, cockpit)',
+        parameters: { view: { type: 'string', enum: ['far', 'near', 'bonnet', 'bumper', 'cockpit'] } }
+      },
+      {
+        name: 'trigger_recovery',
+        description: 'Recover or respawn car back onto the track facing forward if stuck or crashed',
+        parameters: {}
+      },
+      {
+        name: 'get_race_status',
+        description: 'Inspect full race standings, gaps, damaged parts, and sector times',
+        parameters: {}
+      }
+    ];
+  },
+
+  // Tool execution dispatcher
+  async callTool(name, args = {}) {
+    const s = game.state;
+    if (name === 'get_telemetry') {
+      if (!s) return { error: 'Simulation not active' };
+      return {
+        speed_kmh: Math.round(s.speed || 0),
+        rpm: s.rpm || 0,
+        gear: s.gear,
+        throttle: s.throttle,
+        brake: s.brake,
+        steer: s.steer,
+        cruise_active: !!s.auto,
+        phase: s.phase,
+        mode: s.mode
+      };
+    }
+
+    if (name === 'set_driving_mode') {
+      const isCruise = args.mode === 'cruise';
+      game.setCruise(isCruise);
+      return { success: true, mode: isCruise ? 'cruise' : 'manual' };
+    }
+
+    if (name === 'set_camera_view') {
+      const map = { far: 0, near: 1, bonnet: 2, bumper: 3, cockpit: 4 };
+      const idx = map[args.view];
+      if (idx !== undefined) {
+        game.act('view', idx);
+        return { success: true, view: args.view };
+      }
+      return { error: 'Unknown view' };
+    }
+
+    if (name === 'trigger_recovery') {
+      game.act('back');
+      return { success: true, action: 'back_on_road' };
+    }
+
+    if (name === 'get_race_status') {
+      if (!s) return { error: 'Simulation not active' };
+      return {
+        place: s.place,
+        cars: s.cars,
+        lap: s.lap,
+        total_laps: s.laps,
+        lap_time: s.time,
+        ahead_gap: s.ahead,
+        behind_gap: s.behind,
+        damaged: s.worn || 0,
+        tower: (s.tower || []).map(r => ({ place: r.place, number: r.number, name: r.name, gap: r.gap }))
+      };
+    }
+
+    return { error: `Tool ${name} not recognized` };
+  }
+};
 window.gameFast = () => Number(query.get('fast') ?? 1) || 1;
 window.gameOff = () => query.get('off') ?? '';
 window.gameChoice = name => query.get(name) ?? '';
@@ -374,8 +517,8 @@ addEventListener('keydown', event => {
     game.held.add(event.code);
     for (const action of ['up', 'down', 'back', 'view', 'mute', 'fullscreen'])
       if (settings.keys[action].includes(event.code)) act(action);
-    // Only for a developer or a test: hand the car to the autopilot.
-    if (event.code === 'KeyP' && query.has('dev')) ask(`auto ${+!game.state.auto}`);
+    // KeyP toggles cruise/autopilot in drive mode
+    if (event.code === 'KeyP') game.setCruise();
     return event.preventDefault();
   }
   const menu = {
@@ -474,7 +617,7 @@ const SCREENS = {
       choice('Racing line', 'line', ['off', 'corners', 'full'], value => ({ off: 'Off', corners: 'Corners', full: 'Full' })[value]),
       choice('Damage', 'damage', ['full', 'marks'], value => value === 'marks' ? 'Marks only' : 'Full'),
       { heading: 'View' },
-      choice('Camera', 'view', [0, 1, 2, 3], value => VIEWS[value]),
+      choice('Camera', 'view', [0, 1, 2, 3, 4], value => VIEWS[value]),
       { label: 'Full screen', value: () => onOff(!!document.fullscreenElement), turn: fullscreen },
       { heading: 'Volumes' },
       level('Everything', 'master'), level('Car', 'car'), level('Lights, laps and menus', 'effects'), level('Menu music', 'music'),
@@ -483,6 +626,12 @@ const SCREENS = {
       { heading: 'Display' },
       choice('Speed in', 'units', ['km/h', 'mph']),
       choice('Readout for developers', 'readout', [false, true], onOff),
+      { heading: 'Flow Experience' },
+      choice('AI Spotter Voice', 'spotter', [true, false], onOff),
+      { label: 'Cruise Mode', value: () => game.state?.auto ? 'Active' : 'Off', turn: () => {
+        game.setCruise();
+        render();
+      }},
       { label: 'Back', go: () => show(optionsFrom) },
     ],
   },
@@ -509,6 +658,10 @@ const SCREENS = {
     items: () => [
       { label: 'Resume', go: resume },
       { label: 'Restart', go: again },
+      { label: () => game.state?.auto ? 'Switch to Manual Drive' : 'Activate Cruise Mode', go: () => {
+        game.setCruise();
+        render();
+      }},
       { label: 'Options', go: () => { optionsFrom = 'pause'; show('options'); } },
       { label: 'Leave for the menu', go: toMenu },
     ],
@@ -747,6 +900,8 @@ function say(text, kind = 'plain', brief = false) {
 // the right way again, or is put back. `game.wayBack` says what is up.
 const way = { stuck: 0, wrong: 0, pushing: 0, struck: -1e9, up: false, nose: false };
 function wayReset() {
+  clearTimeout(autoRecoverTimer);
+  autoRecoverTimer = null;
   Object.assign(way, { stuck: 0, wrong: 0, pushing: 0, struck: -1e9, up: false, nose: false });
 }
 function wayBack(state, running) {
@@ -770,6 +925,18 @@ function wayBack(state, running) {
     else if (way.pushing >= 1 || (last && last.at[2] > 1 && state.clock - last.t < 3)) way.nose = true;
     if (!way.up) way.up = way.stuck >= 2 || way.wrong >= 3;
     else if (state.speed >= 10 && !backwards && !state.reverse) way.up = false;
+    // Auto-recover in Cruise Mode: if stuck off-track or facing wrong way, auto reset after 2.5s
+    if (game.state?.auto && way.up) {
+      if (!autoRecoverTimer) {
+        autoRecoverTimer = setTimeout(() => {
+          autoRecoverTimer = null;
+          if (game.state?.auto && way.up) ask('back');
+        }, 2500);
+      }
+    } else if (autoRecoverTimer && !way.up) {
+      clearTimeout(autoRecoverTimer);
+      autoRecoverTimer = null;
+    }
   }
   // (A page kept from before this was written has no place for it.)
   if (!$('wayback')) return;
@@ -837,7 +1004,60 @@ const LEDS = 12;
 $('leds').innerHTML = '<i></i>'.repeat(LEDS);
 $('lights').innerHTML = '<i></i>'.repeat(5);
 
-// A car beside or behind (H5): a mark at each side of the screen for the
+// ------------------------------------------------------------- AI Spotter (Pit Wall)
+// Edge-evaluated deterministic spotter using browser SpeechSynthesis
+let lastSpotterCall = 0;
+let lastNearSide = null;
+let lastSectorLead = null;
+let lastWornWarn = false;
+
+function spotterRadio(phrase, minInterval = 4000) {
+  if (!settings.spotter || !window.speechSynthesis) return;
+  const now = performance.now();
+  if (now - lastSpotterCall < minInterval) return;
+  lastSpotterCall = now;
+
+  try {
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(phrase);
+    utt.rate = 1.15;
+    utt.pitch = 0.95;
+    utt.volume = Math.min(1, (settings.effects || 8) / 10);
+    window.speechSynthesis.speak(utt);
+  } catch (e) {
+    // Audio context or speech policy blocked
+  }
+}
+
+function updateSpotter(state) {
+  if (!settings.spotter || game.screen !== 'drive' || state.mode !== 'race') return;
+
+  // 1. Blind-spot / overtaking awareness
+  if (state.sides) {
+    const leftNear = state.sides[0] && state.sides[0][0] > -5;
+    const rightNear = state.sides[1] && state.sides[1][0] > -5;
+    const sideKey = `${leftNear}-${rightNear}`;
+
+    if (sideKey !== lastNearSide) {
+      lastNearSide = sideKey;
+      if (leftNear && rightNear) spotterRadio('Car on both sides, hold line', 5000);
+      else if (leftNear) spotterRadio('Car on your left', 4500);
+      else if (rightNear) spotterRadio('Car on your right', 4500);
+    }
+  }
+
+  // 2. Damage / tire wear advisory
+  if (state.worn && state.worn > 0.4 && !lastWornWarn) {
+    lastWornWarn = true;
+    spotterRadio('Tire degradation detected, balance your exits', 8000);
+  }
+
+  // 3. Clear track notice after passing
+  if (state.ahead && state.ahead > 3.0 && state.place === 1 && lastSectorLead !== 'p1') {
+    lastSectorLead = 'p1';
+    spotterRadio('Clear air ahead, you are leading', 10000);
+  }
+}
 // nearest car on that side, "close" while it is behind within 25 m,
 // "level" once its nose reaches the player's rear wheels; nothing while
 // it is ahead and in view. `game.nearMark` says what is shown, for a
@@ -890,14 +1110,24 @@ function tower(state) {
 
 function display(state) {
   nearMark(state);
+  updateSpotter(state);
   mapMark(state);
   const driving = game.screen === 'drive' || game.screen === 'pause';
   document.body.classList.toggle('driving', driving && state.mode !== 'demo');
   document.body.dataset.mode = state.mode;
+  const isCockpit = settings.view === 4 && driving && state.mode !== 'demo';
+  document.body.classList.toggle('view-cockpit', isCockpit);
+  if (isCockpit) {
+    const wheel = $('cockpit-wheel');
+    if (wheel) {
+      const steerDeg = (state.steer || 0) * 85;
+      wheel.style.transform = `rotate(${steerDeg.toFixed(1)}deg)`;
+    }
+  }
   const mph = settings.units === 'mph';
   const speed = Math.round(state.speed * (mph ? 0.621371 : 1));
   // What a test or a tool can read of the car without the display.
-  window.hudText = `${speed} ${settings.units}   gear ${state.gear}   ${state.rpm} rpm\n${state.mode} ${state.phase}   place ${state.place} of ${state.cars}   lap ${state.lap} of ${state.laps}   ${clock(state.time)}\n${state.frame.toFixed(1)} ms a frame   ${state.auto ? 'autopilot' : 'driver'}   ${game.screen}`;
+  window.hudText = `${speed} ${settings.units}   gear ${state.gear}   ${state.rpm} rpm\n${state.mode} ${state.phase}   place ${state.place} of ${state.cars}   lap ${state.lap} of ${state.laps}   ${clock(state.time)}\n${state.frame.toFixed(1)} ms a frame   ${state.auto ? 'autopilot (Cruise)' : 'driver'}   ${game.screen}`;
   if (settings.readout) write('readout', `${window.hudText}\nthrottle ${state.throttle} brake ${state.brake} steer ${state.steer}\n${state.hash}`);
   if (state.mode === 'demo') return;
 
