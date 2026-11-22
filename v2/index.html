@@ -1,6 +1,55 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Tachyon Sprint</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Before anything heavy is asked for: who is shown the card instead of the game (MOBILE.md,
+// stage (a)). A phone or tablet, an app's own browser, or a browser without WebGPU cannot play
+// today (no touch controls; a phone's browser kills a page that holds 2 GB), so it fetches
+// nothing of the game: no program, no picture, no preload, until "Try it here anyway".
+// `raceDevice` is the one test of a phone, used by the card and by the counter at the end.
+window.raceDevice = () => {
+  const d = { mobile: false, inapp: '', ipad: false, webgpu: false };
+  try {
+    const nav = navigator, ua = nav.userAgent || '';
+    const has = q => { try { return matchMedia(q).matches; } catch { return false; } };
+    d.ipad = /Macintosh/.test(ua) && nav.maxTouchPoints > 1;
+    d.mobile = !!(nav.userAgentData?.mobile || (has('(pointer: coarse)') && !has('(any-pointer: fine)')) || /Android|iPhone|iPad|iPod|Mobi/.test(ua) || d.ipad);
+    d.inapp = /Twitter/.test(ua) ? 'x' : /LinkedInApp/.test(ua) ? 'linkedin' : /Instagram/.test(ua) ? 'instagram' : /FBAN|FBAV|FB_IAB|FBIOS/.test(ua) ? 'facebook' : '';
+    d.webgpu = 'gpu' in nav;
+  } catch { /* what could be read */ }
+  return d;
+};
+(() => {
+  const d = window.raceDevice();
+  // `card`: 'inapp', 'phone', 'nowebgpu', or '' for the game.
+  const card = window.raceCard = d.inapp ? 'inapp' : d.mobile ? 'phone' : !d.webgpu ? 'nowebgpu' : '';
+  // The release's links (release.py writes them here): the program, the picture list and the
+  // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
+  // links in the page would be; a carded visitor gets them only on "Try it here anyway".
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.57c35f461e.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"}];
+  const lead = () => {
+    for (const a of ahead) {
+      const link = document.createElement('link');
+      for (const k in a) link.setAttribute(k, a[k]);
+      document.head.append(link);
+    }
+  };
+  if (!card) { lead(); return; }
+  const root = document.documentElement, port = document.querySelector('meta[name=viewport]');
+  root.classList.add('carded');
+  port.content += ', viewport-fit=cover';
+  // The page's module waits on this (below); "Try it here anyway" lets it go.
+  window.raceGo = new Promise(go => {
+    window.raceAnyway = () => {
+      root.classList.remove('carded');
+      port.content = port.content.replace(', viewport-fit=cover', '');
+      window.raceAnyway = () => {};
+      lead();
+      go();
+    };
+  });
+})();
+</script>
 <style>
 /* Sizes follow the window (its height, or its width when it is narrow), so
    the display reads the same at 1280 by 720 as in full screen. */
@@ -268,8 +317,55 @@ body:not(.driving) .near,.clean .near{display:none}
 #firstrun b{display:block;font-size:15px;letter-spacing:.12em;text-transform:uppercase}
 #firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
 .clean #firstrun{display:none}
+
+/* --------------------------------------------------------------- card */
+/* What a phone, an app's browser or a browser without WebGPU is shown instead of the game
+   (the script at the top of the head): the game moving, its name, one line, and the link
+   to keep for a computer. Portrait: one column; a wide screen: the film beside the words. */
+#card{display:none}
+html.carded #card{position:fixed;inset:0;z-index:20;display:flex;overflow-y:auto;background:#0b0d10;
+  font-size:clamp(15px,min(4.3vw,4.2vh),21px);line-height:1.35;user-select:text;-webkit-tap-highlight-color:transparent;
+  padding:max(1em,env(safe-area-inset-top)) max(1em,env(safe-area-inset-right)) max(1em,env(safe-area-inset-bottom)) max(1em,env(safe-area-inset-left))}
+html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.carded #firstrun{display:none}
+#card-in{margin:auto;width:100%;max-width:26em;display:flex;flex-direction:column;gap:1.1em}
+#card-film{position:relative;aspect-ratio:16/9;border-radius:.45em;overflow:hidden;border:1px solid var(--edge);
+  background:radial-gradient(120% 90% at 50% 110%,#3a1210,#0b0d10 70%)}
+#card-film video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+#card-film::after{content:"";position:absolute;inset:auto 0 0;height:.22em;background:linear-gradient(90deg,var(--red) 30%,var(--amber) 30% 46%,transparent 46%)}
+#card h1{margin:0;font-size:2.5em;font-style:italic;font-weight:800;letter-spacing:.02em;line-height:1}
+#card h1::after{content:"";display:block;width:2em;height:.1em;background:var(--red);margin:.22em 0 0}
+#card-line{margin:0;font-size:1.1em;font-weight:600;color:#e1e6eb}
+#card-open{margin:0;padding:.45em .8em .5em;border-left:.24em solid var(--amber);background:rgba(255,200,61,.08);color:var(--amber);font-weight:600}
+#card-buttons{display:flex;flex-direction:column;gap:.55em}
+#card button{font:inherit;cursor:pointer;-webkit-appearance:none;appearance:none}
+#card .act{position:relative;min-height:2.75em;padding:.5em 1em .5em 1.3em;text-align:left;font-size:1.08em;font-weight:700;letter-spacing:.02em;
+  color:var(--ink);background:rgba(255,255,255,.08);border:1px solid var(--edge);border-radius:.3em}
+#card .act.first{color:#0b0d10;background:#fff;border-color:#fff}
+#card .act.first::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.3em;background:var(--red);border-radius:.3em 0 0 .3em}
+#card .act.done{color:var(--green);border-color:var(--green)}
+#card-anyway{align-self:flex-start;justify-self:start;padding:.3em 0;font-size:.82em!important;font-weight:500;color:var(--dim);background:none;border:0;text-decoration:underline;text-underline-offset:.2em}
+#card-anyway small{font-size:1em;opacity:.8}
+@media (min-aspect-ratio:5/4){
+  #card-in{max-width:min(58em,100%);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:center;gap:.7em 1.6em}
+  #card-buttons{gap:.45em}#card .act{min-height:2.5em}
+  #card-film{grid-column:1;grid-row:1 / span 6}#card-in>:not(#card-film){grid-column:2}
+  #card h1{font-size:2.1em}
+}
 </style>
-<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.57c35f461e.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
+</head><body data-screen="loading" data-mode="demo">
+<div id="card" role="dialog" aria-labelledby="card-title">
+  <div id="card-in">
+    <div id="card-film"><video id="card-clip" muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true"></video></div>
+    <h1 id="card-title">Tachyon Sprint</h1>
+    <p id="card-line">Built for a keyboard and a big screen. Play it on a computer.</p>
+    <p id="card-open" hidden></p>
+    <div id="card-buttons">
+      <button class="act first" id="card-send">Send the link to my computer</button>
+      <button class="act" id="card-copy">Copy link</button>
+    </div>
+    <button id="card-anyway">Try it here anyway <small>· a large download</small></button>
+  </div>
+</div>
 <div id="wrap"><canvas id="car"></canvas></div>
 
 <div id="hud">
@@ -331,6 +427,80 @@ body:not(.driving) .near,.clean .near{display:none}
 <div id="note">Loading…</div>
 
 <script src="config.js"></script>
+<script>
+// The card (the script at the top of the head chose who sees it). Its film and the film's first
+// frame are asked for here only, so no one else fetches them. Counted through `race-count`
+// (the counter at the end of the page): race_card {kind} once it shows, race_card_act {act}.
+(() => {
+  const kind = window.raceCard;
+  if (!kind) return;
+  const $ = id => document.getElementById(id);
+  const LINK = 'https://satyam-fp.github.io/race/';
+  const count = (event, more) => document.dispatchEvent(new CustomEvent('race-count', { detail: { event, ...more } }));
+  if (kind === 'nowebgpu') $('card-line').textContent = 'This browser cannot draw the game. Open it in Chrome or Edge on a computer.';
+  if (kind === 'inapp') {
+    const app = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook' }[window.raceDevice().inapp] ?? 'this app';
+    $('card-open').textContent = `Or open it in your phone's own browser: in ${app}, tap the ··· menu and choose "Open in browser".`;
+    $('card-open').hidden = false;
+  }
+  if (kind === 'nowebgpu') $('card-anyway').querySelector('small').remove();
+  const clip = $('card-clip');
+  try {
+    clip.poster = window.assetUrl('assets/card/drive.jpg');
+    clip.src = window.assetUrl('assets/card/drive.mp4');
+    clip.play?.()?.catch?.(() => { /* a saver mode: the poster stays */ });
+  } catch { /* the panel without its film */ }
+  clip.addEventListener('error', () => clip.removeAttribute('src'), { once: true });
+
+  const say = (button, words) => {
+    const was = button.dataset.was ??= button.textContent;
+    button.textContent = words;
+    button.classList.add('done');
+    clearTimeout(button.timer);
+    button.timer = setTimeout(() => { button.textContent = was; button.classList.remove('done'); }, 2500);
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(LINK); return true; } catch { /* the old way */ }
+    try {
+      const t = Object.assign(document.createElement('textarea'), { value: LINK });
+      t.setAttribute('readonly', '');
+      t.style.cssText = 'position:fixed;opacity:0';
+      document.body.append(t);
+      t.select();
+      const done = document.execCommand('copy');
+      t.remove();
+      return done;
+    } catch { return false; }
+  };
+  $('card-send').addEventListener('click', async () => {
+    count('race_card_act', { act: 'send', kind });
+    const text = 'Tachyon Sprint: a racing game for a computer with a keyboard. Open this there:';
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Tachyon Sprint', text, url: LINK }); return; }
+      catch (e) { if (e?.name === 'AbortError') return; /* refused here: the mail below */ }
+    }
+    // A mail to oneself: the mail program opens with the link written in.
+    const mail = document.createElement('a');
+    mail.href = `mailto:?subject=${encodeURIComponent('Tachyon Sprint, for my computer')}&body=${encodeURIComponent(`${text}\n${LINK}`)}`;
+    document.body.append(mail);
+    mail.click();
+    mail.remove();
+  });
+  $('card-copy').addEventListener('click', async () => {
+    count('race_card_act', { act: 'copy', kind });
+    say($('card-copy'), await copy() ? 'Copied' : LINK);
+  });
+  $('card-anyway').addEventListener('click', () => {
+    count('race_card_act', { act: 'anyway', kind });
+    clip.pause();
+    clip.removeAttribute('src');
+    clip.load();
+    window.raceAnyway();
+  });
+  // The counter is the page's last script: told once it has run.
+  document.addEventListener('DOMContentLoaded', () => count('race_card', { kind }), { once: true });
+})();
+</script>
 <script type="module">
 const note = document.getElementById('note');
 const log = console.log, info = console.info;
@@ -345,6 +515,8 @@ window.addEventListener('error', e => { window.lastError = String(e.message); })
 const at = window.assetUrl;
 // (A script is asked for by a whole address: a bare name is not one.)
 const from = name => new URL(at(name), document.baseURI).href;
+// A visitor shown the card (the head's first script) asks for nothing until "Try it here anyway".
+if (window.raceGo) await window.raceGo;
 const program = navigator.gpu ? WebAssembly.compileStreaming(fetch('car_bg.wasm')) : null;
 program?.then(() => performance.mark('wasm-compiled'), () => {});
 // A release names the files the title waits for (`config.js`'s `first`, largest
@@ -400,6 +572,8 @@ else program.then(module => car.default({ module_or_path: module }))
 //                   screen, panic (the program's last console.error, a panic's own words), the GPU's
 //                   facts, gpu_lost and gpu_error; before the title, where the loading was (below)
 //   race_shared     how, from (sent by game.js through a `race-count` event)
+//   race_card       kind (phone, inapp, nowebgpu): the card shown instead of the game (the page's own
+//                   script, through `race-count`); race_card_act: act (send, copy, anyway), kind
 // Every message has game, version (v0, v1, v2 from the address, else dev) and seconds since the
 // page opened. Frames are timed here, with requestAnimationFrame, only while the screen is `drive`
 // and the page is shown: each frame one subtraction and one count in a fixed histogram of quarter
@@ -511,8 +685,8 @@ else program.then(module => car.default({ module_or_path: module }))
     try {
       const nav = navigator, ua = nav.userAgent || '', data = nav.userAgentData;
       const has = q => { try { return matchMedia(q).matches; } catch { return false; } };
-      const ipad = /Macintosh/.test(ua) && nav.maxTouchPoints > 1;
-      m.mobile = !!(data?.mobile || (has('(pointer: coarse)') && !has('(any-pointer: fine)')) || /Android|iPhone|iPad|iPod|Mobi/.test(ua) || ipad);
+      const device = window.raceDevice(), ipad = device.ipad;   // the head's test, shared with the card
+      m.mobile = device.mobile;
       m.touch = nav.maxTouchPoints || 0;
       const platform = data?.platform || '';
       m.os = /iPhone|iPad|iPod/.test(ua) || ipad ? 'ios' : /Android/.test(platform + ua) ? 'android' : /Chrome ?OS|CrOS/.test(platform + ua) ? 'chromeos'
@@ -530,8 +704,7 @@ else program.then(module => car.default({ module_or_path: module }))
       }
       m.browser = name;
       m.browser_v = major;
-      const inapp = /Twitter/.test(ua) ? 'x' : /LinkedInApp/.test(ua) ? 'linkedin' : /Instagram/.test(ua) ? 'instagram' : /FBAN|FBAV|FB_IAB|FBIOS/.test(ua) ? 'facebook' : '';
-      if (inapp) m.inapp = inapp;
+      if (device.inapp) m.inapp = device.inapp;
       m.cores = nav.hardwareConcurrency || 0;
       if (nav.deviceMemory) m.memory_gb = nav.deviceMemory;
       m.dpr = round(devicePixelRatio || 1, 100);
@@ -672,7 +845,8 @@ else program.then(module => car.default({ module_or_path: module }))
   };
 
   send('race_opened', { from, returning, wide: innerWidth, high: innerHeight, ...machine() });
-  document.addEventListener('race-count', ({ detail: d }) => send(d.event, { how: d.how, from: d.from }));
+  // game.js's race_shared {how, from}; the card's race_card {kind} and race_card_act {act, kind}.
+  document.addEventListener('race-count', ({ detail: { event, ...more } }) => send(event, more));
 
   // Errors: the first one a visit, with no address or query in it.
   let erred = false, titled = false, left = false;
