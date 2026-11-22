@@ -147,6 +147,16 @@ html.clean #wayback,html.clean #damage{display:none}
 body:not([data-screen=drive]) #pause-button{display:none}
 #notice{position:fixed;left:50%;top:1.4em;transform:translateX(-50%);padding:.35em 1.2em;font-weight:700;letter-spacing:.1em;
   color:var(--amber);background:var(--panel);border:1px solid var(--edge);border-radius:.3em;z-index:3}
+/* Auto detail's notice: a sentence. Driving, low in the middle, clear of the lights, the timing,
+   the tower, the map and the dash; on a menu, at the foot of the scenery beside the panel. */
+#notice.detail{top:auto;bottom:5.2em;width:max-content;max-width:min(30em,calc(100vw - 2em));font-size:var(--u);font-weight:600;
+  letter-spacing:.02em;line-height:1.4;color:var(--ink);border-left:.24em solid var(--amber)}
+body:not([data-screen=drive]):not([data-screen=pause]) #notice.detail{left:auto;right:1.6em;bottom:1.5em;transform:none;max-width:min(24em,calc(100vw - 2em))}
+html.clean #notice.detail{display:none}
+/* The frame rate: below the dash in the bottom right corner, on the title and while driving. */
+#fps{display:none;position:fixed;right:1.6em;bottom:.25em;font-size:.95em;font-weight:700;letter-spacing:.06em;color:var(--ink);opacity:.9;text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.6);pointer-events:none;z-index:2}
+body.show-fps[data-screen=title] #fps,body.show-fps[data-screen=drive] #fps{display:block}
+html.clean #fps{display:none!important}
 #readout{display:none;position:absolute;left:1.6em;bottom:1.5em;padding:.5em .8em;font:11px/1.5 ui-monospace,Menlo,monospace;white-space:pre;background:var(--panel);border-radius:.3em}
 body.readout #readout{display:block}
 
@@ -259,7 +269,7 @@ body:not(.driving) .near,.clean .near{display:none}
 #firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
 .clean #firstrun{display:none}
 </style>
-<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.1d1d62f61a.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
+<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.4a90d40437.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
 <div id="wrap"><canvas id="car"></canvas></div>
 
 <div id="hud">
@@ -312,6 +322,7 @@ body:not(.driving) .near,.clean .near{display:none}
   <div id="readout"></div>
 </div>
 <div id="notice" hidden></div>
+<div id="fps"></div>
 <div id="near-left" class="near" data-side="left" data-kind="none"></div>
 <div id="near-right" class="near" data-side="right" data-kind="none"></div>
 <div id="firstrun" hidden></div>
