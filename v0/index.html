@@ -176,6 +176,11 @@ body:not(.driving) .near,.clean .near{display:none}
 #firstrun b{display:block;font-size:15px;letter-spacing:.12em;text-transform:uppercase}
 #firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
 .clean #firstrun{display:none}
+#newer{position:fixed;top:.7em;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:.7em;padding:.5em .6em .5em 1em;
+  background:var(--panel);border:1px solid var(--amber);border-radius:.35em;color:var(--ink);text-decoration:none;font-size:1.15em;letter-spacing:.04em;white-space:nowrap;user-select:none}
+#newer b{color:var(--amber);font-weight:700}#newer span{background:var(--amber);color:#0b0d10;font-weight:700;padding:.2em .7em;border-radius:.25em}
+#newer:hover span,#newer:focus-visible span{background:#fff}
+body[data-screen=drive] #newer,.clean #newer{display:none}
 </style>
 </head><body data-screen="loading" data-mode="demo">
 <div id="wrap"><canvas id="car"></canvas></div>
@@ -223,6 +228,7 @@ body:not(.driving) .near,.clean .near{display:none}
 
 <div id="menu" hidden></div>
 <div id="note">Loading…</div>
+<a id="newer" href="../v2/"><b>NEW VERSION</b> A quicker car, new sound and a qualifying lap <span>PLAY V2 →</span></a>
 
 <script type="module">
 const note = document.getElementById('note');
