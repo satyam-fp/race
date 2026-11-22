@@ -259,7 +259,7 @@ body:not(.driving) .near,.clean .near{display:none}
 #firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
 .clean #firstrun{display:none}
 </style>
-<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.a6bb642e79.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.49675c7631.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
+<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.97f8cb97c2.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.05676c2a9b.js"></head><body data-screen="loading" data-mode="demo">
 <div id="wrap"><canvas id="car"></canvas></div>
 
 <div id="hud">
@@ -335,30 +335,6 @@ const at = window.assetUrl;
 const from = name => new URL(at(name), document.baseURI).href;
 const program = navigator.gpu ? WebAssembly.compileStreaming(fetch('car_bg.wasm')) : null;
 program?.then(() => performance.mark('wasm-compiled'), () => {});
-// A release names the files the title waits for (`config.js`'s `first`, largest
-// first): ask for them as soon as the program's last byte has come (the line is
-// the program's until then), not when Bevy asks two to four seconds later. Each
-// is asked as the game will ask (CORS, no credentials), so the game's own
-// `fetch` is answered by it and nothing comes twice.
-if (program && window.TACHYON.first?.length) {
-  let asked = false;
-  const ask = () => {
-    if (asked) return;
-    asked = true;
-    performance.mark('first-asked');
-    for (const name of window.TACHYON.first) {
-      const link = document.createElement('link');
-      // Low: what the program asks for itself goes ahead of them.
-      Object.assign(link, { rel: 'preload', as: 'fetch', crossOrigin: 'anonymous', fetchPriority: 'low', href: window.TACHYON.base + name });
-      document.head.append(link);
-    }
-  };
-  const wasm = at('car_bg.wasm');
-  const came = () => performance.getEntriesByType('resource').some(e => e.name.endsWith(wasm) && e.responseEnd > 0);
-  try { new PerformanceObserver((l, o) => { if (came()) { o.disconnect(); ask(); } }).observe({ type: 'resource' }); } catch {}
-  if (came()) ask();
-  program.then(ask, ask);
-}
 const [, , car] = await Promise.all([
   import(from('sound.js')).then(() => import(from('game.js'))),
   null,
