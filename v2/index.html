@@ -269,7 +269,7 @@ body:not(.driving) .near,.clean .near{display:none}
 #firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
 .clean #firstrun{display:none}
 </style>
-<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.2e8e2caf10.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
+<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.57c35f461e.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
 <div id="wrap"><canvas id="car"></canvas></div>
 
 <div id="hud">
@@ -388,20 +388,37 @@ else program.then(module => car.default({ module_or_path: module }))
 //   race_opened     returning (race.player was already kept), from, wide, high, and the machine:
 //                   mobile, touch, os, browser, inapp, cores, memory_gb, dpr, screen, network, webgpu
 //   race_title      returning, the machine again with the GPU (from the adapter `game.js` already
-//                   asked for: game.detail.gpu), and loading: load_s, mb, files, cached; detail,
-//                   detail_asked, scale
+//                   asked for: game.detail.gpu) and its facts (below), and loading: load_s, mb, files,
+//                   cached; detail, detail_asked, scale; the loading's stages (below)
 //   race_started    mode, a drive begun (not the title's demo)
 //   race_drive_end  a drive left for anything but its pause (a result, the menu, a restart):
 //                   mode, laps, finished, and the frames (below)
 //   race_finished   mode, place, and the frames
-//   race_left       the page hidden or closed, once (sendBeacon): screen, titled, drove, and the frames if driving
-//   race_error      the first page error, unhandled rejection or "cannot start" message: what, screen
+//   race_left       the page hidden or closed, once (sendBeacon): screen, titled, drove, and the frames if
+//                   driving; before the title, where the loading was (below)
+//   race_error      the first page error, unhandled rejection, "cannot start" message or lost GPU: what,
+//                   screen, panic (the program's last console.error, a panic's own words), the GPU's
+//                   facts, gpu_lost and gpu_error; before the title, where the loading was (below)
 //   race_shared     how, from (sent by game.js through a `race-count` event)
 // Every message has game, version (v0, v1, v2 from the address, else dev) and seconds since the
 // page opened. Frames are timed here, with requestAnimationFrame, only while the screen is `drive`
 // and the page is shown: each frame one subtraction and one count in a fixed histogram of quarter
 // milliseconds; from it fps (the middle frame), fps_low (the 95th in a hundred, as a rate), long
 // (the share over 50 ms), frames, drive_s, and Auto's detail, scale and detail_steps (its steps down).
+// The loading's stages, seconds from the page's opening, each when reached (performance marks, the
+// page's and the program's `first::mark`, and the counter's own view of the network): t_scripts (the
+// page's scripts run), t_program (the program's last byte), t_compiled, t_first_frame (Bevy's first
+// frame to the page), t_cars (the cars made), t_lap0 and t_lap1 (the warm-up lap begun and done),
+// t_bytes (the last byte of any file before the title), t_ready (the game says it is whole); the
+// lap's frames as the page's requestAnimationFrame saw them: lap_frames, lap_worst_ms. Before the
+// title (race_left, race_error): stage (the furthest of scripts, program, compiled, first_frame,
+// cars, lap0, lap1, ready; else opened), mb_so_far, files_so_far, mbps (megabytes over the seconds
+// to the last file come; a file still coming, the program most of all, counts nothing yet).
+// The GPU's facts (game.detail.gpu.adapter, the one adapter game.js asked for): features (of bc
+// etc2 astc f32filter timestamp ifi f16), fallback (a software GPU), max_tex2d, max_groups,
+// max_sampled, max_storage, max_colors, max_buffer_mb. The device the program asks for is watched,
+// never changed: requestDevice's own promise is returned, and its lost promise and uncapturederror
+// are only listened to (gpu_lost: reason and message; gpu_error: the first error nobody caught).
 (() => {
   const ask = new URLSearchParams(location.search);
   const forced = ask.get('count') === '1';
@@ -430,6 +447,63 @@ else program.then(module => car.default({ module_or_path: module }))
   };
   const body = document.body;
   const game = () => window.game ?? {};
+  const clean = (s, n) => String(s ?? '').replace(/[a-z][a-z0-9+.-]*:\/\/[^\s'")]+/gi, url => url.split(/[?#]/)[0].split('/').pop() || 'address')
+    .replace(/\?[^\s'")]*/g, '').slice(0, n);
+
+  // The program's last words: a panic is written to console.error by Bevy's hook
+  // (console_error_panic_hook) before its trap ("unreachable") reaches the page. The last
+  // panic is kept over any later error line; its stack is left out. Only text is kept here.
+  const said = { panic: '', last: '' };
+  try {
+    const write = console.error;
+    console.error = function (...a) {
+      try {
+        const text = a.filter(x => typeof x === 'string' && !/(^|;)\s*(color|font-weight|background)\s*:/.test(x))
+          .join(' ').replace(/%c/g, '').split('\n\nStack:')[0].trim();
+        if (text) { if (/panicked at/.test(text)) said.panic = text.slice(0, 600); else said.last = text.slice(0, 600); }
+      } catch { /* as it is */ }
+      return write.apply(this, a);
+    };
+  } catch { /* no wrapper: no panic words */ }
+
+  // The device the program asks for, listened to and never changed.
+  const gpuSaid = {};
+  try {
+    const adapterProto = window.GPUAdapter?.prototype, asking = adapterProto?.requestDevice;
+    if (asking) adapterProto.requestDevice = function (...a) {
+      const p = asking.apply(this, a);
+      try {
+        p.then(device => {
+          try {
+            device.lost?.then(l => { try {
+              if (l?.reason === 'destroyed' || left) return;   // a closing page's device is not a fault
+              gpuSaid.lost = `${l?.reason ?? ''}: ${clean(l?.message, 120)}`;
+              error(`GPU device lost: ${gpuSaid.lost}`);
+            } catch { /* as it is */ } });
+            device.addEventListener?.('uncapturederror', e => { try { if (!gpuSaid.error) gpuSaid.error = clean(e?.error?.message, 200); } catch { /* as it is */ } });
+          } catch { /* as it is */ }
+        }, () => {});
+      } catch { /* as it is */ }
+      return p;
+    };
+  } catch { /* not watched */ }
+  const gpuFacts = () => {
+    const f = {};
+    try {
+      const a = game().detail?.gpu?.adapter;
+      if (!a) return f;
+      const has = n => { try { return a.features?.has(n); } catch { return false; } };
+      f.features = [['bc', 'texture-compression-bc'], ['etc2', 'texture-compression-etc2'], ['astc', 'texture-compression-astc'],
+        ['f32filter', 'float32-filterable'], ['timestamp', 'timestamp-query'], ['ifi', 'indirect-first-instance'], ['f16', 'shader-f16']]
+        .filter(([, n]) => has(n)).map(([s]) => s).join(' ');
+      f.fallback = !!(a.info?.isFallbackAdapter ?? a.isFallbackAdapter);
+      const l = a.limits;
+      if (l) Object.assign(f, { max_tex2d: l.maxTextureDimension2D, max_groups: l.maxBindGroups, max_sampled: l.maxSampledTexturesPerShaderStage,
+        max_storage: l.maxStorageBuffersPerShaderStage, max_colors: l.maxColorAttachments, max_buffer_mb: Math.round(l.maxBufferSize / 1048576) });
+    } catch { /* what could be read is sent */ }
+    return f;
+  };
+  const gpuWords = () => ({ ...(gpuSaid.lost ? { gpu_lost: gpuSaid.lost } : {}), ...(gpuSaid.error ? { gpu_error: gpuSaid.error } : {}) });
 
   // The machine: short family names only, never the whole user agent.
   const machine = () => {
@@ -472,21 +546,73 @@ else program.then(module => car.default({ module_or_path: module }))
   };
 
   // What came over the network before the title (the game's own observer does the same).
-  const got = { bytes: 0, files: 0, cached: 0 };
+  // `end`: the last byte of any file so far; `program`: the program's (responseEnd is given
+  // for a file from another origin too), both in milliseconds from the page's opening.
+  const got = { bytes: 0, files: 0, cached: 0, end: 0, program: 0 };
   let watching = null;
+  const took = list => {
+    for (const e of list) {
+      if (e.name.startsWith(CAPTURE)) continue;
+      got.files++;
+      got.bytes += e.transferSize || 0;
+      // Less over the wire than its body: kept by the browser (0, or a 304's headers). A file
+      // from another origin without Timing-Allow-Origin shows neither and counts as neither.
+      if (e.encodedBodySize && e.transferSize < e.encodedBodySize) got.cached++;
+      if (e.responseEnd > got.end) got.end = e.responseEnd;
+      if (!got.program && /car_bg[^/]*\.wasm$/.test(e.name.split(/[?#]/)[0])) got.program = e.responseEnd;
+    }
+  };
   try {
-    watching = new PerformanceObserver(list => {
-      for (const e of list.getEntries()) {
-        if (e.name.startsWith(CAPTURE)) continue;
-        got.files++;
-        got.bytes += e.transferSize || 0;
-        // Less over the wire than its body: kept by the browser (0, or a 304's headers). A file
-        // from another origin without Timing-Allow-Origin shows neither and counts as neither.
-        if (e.encodedBodySize && e.transferSize < e.encodedBodySize) got.cached++;
-      }
-    });
+    watching = new PerformanceObserver(list => took(list.getEntries()));
     watching.observe({ type: 'resource', buffered: true });
   } catch { /* an old browser: no loading figures */ }
+  const gotNow = () => { try { if (watching) took(watching.takeRecords()); } catch { /* as it is */ } };
+
+  // The loading's stages: the marks the page and the program make, in the order they come.
+  const STAGES = [['scripts', 'scripts-run'], ['program', ''], ['compiled', 'wasm-compiled'], ['first_frame', 'first-frame'],
+    ['cars', 'cars-whole'], ['lap0', 'lap-begun'], ['lap1', 'lap-done'], ['ready', 'ready']];
+  const markAt = name => { try { return performance.getEntriesByName(name, 'mark')[0]?.startTime; } catch { return undefined; } };
+  const stages = () => {
+    const t = {};
+    try {
+      gotNow();
+      for (const [short, name] of STAGES) {
+        const ms = name ? markAt(name) : got.program || undefined;
+        if (ms != null) t[`t_${short}`] = round(ms / 1000);
+      }
+      if (got.end) t.t_bytes = round(got.end / 1000);
+    } catch { /* what could be read is sent */ }
+    return t;
+  };
+  const whereLoading = () => {
+    const w = { stage: 'opened' };
+    try {
+      gotNow();
+      const t = stages();
+      for (const [short] of STAGES) if (t[`t_${short}`] != null) w.stage = short;
+      const mb = got.bytes / 1e6;
+      Object.assign(w, { mb_so_far: round(mb), files_so_far: got.files, mbps: got.end > 0 ? round(mb / (got.end / 1000), 100) : 0 }, t);
+    } catch { /* what could be read is sent */ }
+    return w;
+  };
+  // The warm-up lap's frames as the page sees them: the program marks its two ends; between
+  // them one subtraction a frame.
+  const lap = { on: false, n: 0, worst: 0, last: 0 };
+  const lapTick = now => {
+    if (!lap.on) return;
+    if (lap.last && !document.hidden) { const dt = now - lap.last; lap.n++; if (dt > lap.worst) lap.worst = dt; }
+    lap.last = now;
+    requestAnimationFrame(lapTick);
+  };
+  try {
+    const marks = new PerformanceObserver(list => {
+      for (const e of list.getEntries()) {
+        if (e.name === 'lap-begun' && !lap.on && !lap.n) { lap.on = true; requestAnimationFrame(lapTick); }
+        if (e.name === 'lap-done') { lap.on = false; marks.disconnect(); }
+      }
+    });
+    marks.observe({ type: 'mark', buffered: true });
+  } catch { /* no lap frames */ }
 
   const detail = () => {
     const d = game().detail;
@@ -549,23 +675,26 @@ else program.then(module => car.default({ module_or_path: module }))
   document.addEventListener('race-count', ({ detail: d }) => send(d.event, { how: d.how, from: d.from }));
 
   // Errors: the first one a visit, with no address or query in it.
-  let erred = false;
+  let erred = false, titled = false, left = false;
   const error = what => {
     if (erred) return;
     try {
       what = String(what ?? '');
       if (what.includes('Using exceptions for control flow')) return;   // winit's, not an error
       erred = true;
-      what = what.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s'")]+/gi, url => url.split(/[?#]/)[0].split('/').pop() || 'address')
-        .replace(/\?[^\s'")]*/g, '').slice(0, 200);
-      send('race_error', { what, screen: body.dataset.screen ?? '' });
+      what = clean(what, 200);
+      // A panic names its file by the path it was built from: the crate's from its own folder on.
+      const words = (said.panic || said.last).replace(/\/[^\s:]*\/registry\/src\/[^/\s]+\//g, '').replace(/\/rustc\/[0-9a-f]+\//g, '')
+        .replace(/\/(Users|home)\/[^/\s]+\//g, '~/');
+      send('race_error', { what, screen: body.dataset.screen ?? '', ...(words ? { panic: clean(words, 300) } : {}),
+        ...gpuFacts(), ...gpuWords(), ...(titled ? {} : whereLoading()) });
     } catch { /* never stops the game */ }
   };
   addEventListener('error', e => error(e.message || e.error));
   addEventListener('unhandledrejection', e => error(e.reason?.message ?? e.reason));
   document.addEventListener('race-error', e => error(e.detail));
 
-  let was = body.dataset.screen, titled = false, drove = false;
+  let was = body.dataset.screen, drove = false;
   new MutationObserver(() => {
     try {
       const now = body.dataset.screen;
@@ -576,9 +705,13 @@ else program.then(module => car.default({ module_or_path: module }))
         titled = true;
         const gpu = game().detail?.gpu ?? {};
         const cut = s => String(s ?? '').slice(0, 40);
+        const load_s = seconds(), t = stages();
+        lap.on = false;
         try { watching?.disconnect(); } catch { /* as it is */ }
         send('race_title', { returning, ...machine(), gpu_vendor: cut(gpu.vendor), gpu_arch: cut(gpu.arch), gpu_device: cut(gpu.device),
-          load_s: seconds(), mb: round(got.bytes / 1e6), files: got.files, cached: got.files > 0 && got.cached >= got.files * 0.9, ...detail() });
+          ...gpuFacts(), ...gpuWords(),
+          load_s, mb: round(got.bytes / 1e6), files: got.files, cached: got.files > 0 && got.cached >= got.files * 0.9, ...detail(),
+          ...t, ...(lap.n ? { lap_frames: lap.n, lap_worst_ms: Math.round(lap.worst) } : {}) });
       }
       if (now === 'drive' && !drive.on) { begin(); drove = true; }
       else if (now === 'drive') loop();
@@ -592,12 +725,12 @@ else program.then(module => car.default({ module_or_path: module }))
   }).observe(body, { attributes: true, attributeFilter: ['data-screen'] });
 
   // Leaving: the first of the page hidden or closed (a phone seldom says it closed).
-  let left = false;
   const leave = how => {
     if (left) return;
     left = true;
     try {
-      send('race_left', { how, screen: body.dataset.screen ?? '', titled, drove, ...(drive.on ? { mode: body.dataset.mode, ...frames() } : {}) }, true);
+      send('race_left', { how, screen: body.dataset.screen ?? '', titled, drove, ...(drive.on ? { mode: body.dataset.mode, ...frames() } : {}),
+        ...(titled ? {} : whereLoading()) }, true);
     } catch { /* never stops the game */ }
   };
   addEventListener('pagehide', () => leave('close'));
