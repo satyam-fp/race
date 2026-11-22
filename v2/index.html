@@ -259,7 +259,7 @@ body:not(.driving) .near,.clean .near{display:none}
 #firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
 .clean #firstrun{display:none}
 </style>
-<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.4d08311688.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
+<link rel="preconnect" crossorigin href="https://dwotvqq4zvox.cloudfront.net"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"><link rel="preload" as="fetch" crossorigin fetchpriority="high" href="https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/game.142765518c.js"><link rel="modulepreload" crossorigin href="https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"></head><body data-screen="loading" data-mode="demo">
 <div id="wrap"><canvas id="car"></canvas></div>
 
 <div id="hud">
@@ -325,7 +325,8 @@ const note = document.getElementById('note');
 const log = console.log, info = console.info;
 const seen = (...a) => { const m = a.join(' ').match(/frame_ms ([0-9.]+)/); if (m) window.frameMs = +m[1]; };
 console.log = (...a) => { seen(...a); log(...a); }; console.info = (...a) => { seen(...a); info(...a); };
-const failed = why => { window.lastError = String(why); note.textContent = String(why); document.body.dataset.screen = 'loading'; };
+const failed = why => { window.lastError = String(why); note.textContent = String(why); document.body.dataset.screen = 'loading';
+  document.dispatchEvent(new CustomEvent('race-error', { detail: String(why) })); };
 window.addEventListener('error', e => { window.lastError = String(e.message); });
 // The page's scripts and the program come from where `config.js` says.
 // The program is asked for first and compiled as it comes, beside the
@@ -369,39 +370,227 @@ if (!program) failed('This browser has no WebGPU, which the game is drawn with.'
 else program.then(module => car.default({ module_or_path: module }))
   .catch(e => { if (!String(e).includes('Using exceptions for control flow')) failed(e); });
 </script><script>
-// Counts players, namelessly (PostHog): the page opened, the title reached, a drive begun, a
-// result reached, with the version. Only on the public address, or with ?count=1 (marked a
-// test). It sends four small messages and loads nothing; a blocked message changes nothing.
+// Counts players, namelessly (PostHog), and what their machines do. Only on the public address,
+// or with ?count=1 (marked `test`); never under a test's browser (`navigator.webdriver`) unless
+// forced. It loads nothing and sends a handful of small messages a visit; every part is in `try`,
+// so a blocked or broken message changes nothing in the game. Events (README, "Counting players"):
+//   race_opened     returning (race.player was already kept), from, wide, high, and the machine:
+//                   mobile, touch, os, browser, inapp, cores, memory_gb, dpr, screen, network, webgpu
+//   race_title      returning, the machine again with the GPU (from the adapter `game.js` already
+//                   asked for: game.detail.gpu), and loading: load_s, mb, files, cached; detail,
+//                   detail_asked, scale
+//   race_started    mode, a drive begun (not the title's demo)
+//   race_drive_end  a drive left for anything but its pause (a result, the menu, a restart):
+//                   mode, laps, finished, and the frames (below)
+//   race_finished   mode, place, and the frames
+//   race_left       the page hidden or closed, once (sendBeacon): screen, titled, drove, and the frames if driving
+//   race_error      the first page error, unhandled rejection or "cannot start" message: what, screen
+//   race_shared     how, from (sent by game.js through a `race-count` event)
+// Every message has game, version (v0, v1, v2 from the address, else dev) and seconds since the
+// page opened. Frames are timed here, with requestAnimationFrame, only while the screen is `drive`
+// and the page is shown: each frame one subtraction and one count in a fixed histogram of quarter
+// milliseconds; from it fps (the middle frame), fps_low (the 95th in a hundred, as a rate), long
+// (the share over 50 ms), frames, drive_s, and Auto's detail, scale and detail_steps (its steps down).
 (() => {
-  const forced = new URLSearchParams(location.search).get('count') === '1';
+  const ask = new URLSearchParams(location.search);
+  const forced = ask.get('count') === '1';
   if (!forced && (location.hostname !== 'satyam-fp.github.io' || navigator.webdriver)) return;
+  const CAPTURE = 'https://us.i.posthog.com/i/v0/e/';
   const fresh = () => crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  let id;
-  try { id = localStorage.getItem('race.player'); if (!id) { id = fresh(); localStorage.setItem('race.player', id); } } catch { id = fresh(); }
+  let id, returning = false;
+  try { id = localStorage.getItem('race.player'); returning = !!id; if (!id) { id = fresh(); localStorage.setItem('race.player', id); } } catch { id = fresh(); }
   const version = (location.pathname.match(/\/(v\d+)\//) ?? [0, 'dev'])[1];
+  const round = (x, n = 10) => Math.round(x * n) / n;
+  const seconds = () => round(performance.now() / 1000);
   let from = '';
   try { from = document.referrer ? new URL(document.referrer).hostname : ''; } catch { /* no referrer */ }
-  const send = (event, more = {}) => {
+  // Plain text (the same JSON): a simple request, no CORS preflight, one round trip. `beacon`
+  // for a closing page: sendBeacon, else the fetch with keepalive.
+  const TEXT = 'text/plain;charset=UTF-8';
+  const send = (event, more = {}, beacon = false) => {
     try {
-      fetch('https://us.i.posthog.com/i/v0/e/', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: 'phc_CAun9nTMtAa6B7tecRUxt2piXvP6Q3LPCddXSDDNKPJy', event, distinct_id: id,
-          properties: { game: 'tachyon-sprint', version, $current_url: location.origin + location.pathname, $process_person_profile: false,
-            seconds: Math.round(performance.now() / 100) / 10, ...(forced ? { test: true } : {}), ...more } }) }).catch(() => {});
+      const body = JSON.stringify({ api_key: 'phc_CAun9nTMtAa6B7tecRUxt2piXvP6Q3LPCddXSDDNKPJy', event, distinct_id: id,
+        properties: { game: 'tachyon-sprint', version, $current_url: location.origin + location.pathname, $process_person_profile: false,
+          seconds: seconds(), ...(forced ? { test: true } : {}), ...more } });
+      let sent = false;
+      if (beacon) try { sent = navigator.sendBeacon?.(CAPTURE, new Blob([body], { type: TEXT })) === true; } catch { /* the fetch below */ }
+      if (!sent) fetch(CAPTURE, { method: 'POST', keepalive: true, headers: { 'Content-Type': TEXT }, body }).catch(() => {});
     } catch { /* counting never stops the game */ }
   };
-  send('race_opened', { from, webgpu: 'gpu' in navigator, wide: innerWidth, high: innerHeight });
-  document.addEventListener('race-count', ({ detail }) => send(detail.event, { how: detail.how, from: detail.from }));
   const body = document.body;
-  let was = body.dataset.screen, titled = false;
+  const game = () => window.game ?? {};
+
+  // The machine: short family names only, never the whole user agent.
+  const machine = () => {
+    const m = {};
+    try {
+      const nav = navigator, ua = nav.userAgent || '', data = nav.userAgentData;
+      const has = q => { try { return matchMedia(q).matches; } catch { return false; } };
+      const ipad = /Macintosh/.test(ua) && nav.maxTouchPoints > 1;
+      m.mobile = !!(data?.mobile || (has('(pointer: coarse)') && !has('(any-pointer: fine)')) || /Android|iPhone|iPad|iPod|Mobi/.test(ua) || ipad);
+      m.touch = nav.maxTouchPoints || 0;
+      const platform = data?.platform || '';
+      m.os = /iPhone|iPad|iPod/.test(ua) || ipad ? 'ios' : /Android/.test(platform + ua) ? 'android' : /Chrome ?OS|CrOS/.test(platform + ua) ? 'chromeos'
+        : /Win/.test(platform + ua) ? 'windows' : /mac/i.test(platform + ua) ? 'macos' : /Linux/.test(platform + ua) ? 'linux' : 'other';
+      const brand = data?.brands?.find(b => !/Not.?A.?Brand|^Chromium$/i.test(b.brand)) ?? data?.brands?.find(b => b.brand === 'Chromium');
+      let name = '', major = 0;
+      if (brand) {
+        name = /Chrome/.test(brand.brand) ? 'chrome' : /Edge/.test(brand.brand) ? 'edge' : /Opera/.test(brand.brand) ? 'opera' : brand.brand.toLowerCase().replace(/[^a-z]/g, '').slice(0, 16);
+        major = parseInt(brand.version, 10) || 0;
+      } else {
+        const tests = [['edge', /Edg(?:A|iOS)?\/(\d+)/], ['opera', /OPR\/(\d+)/], ['samsung', /SamsungBrowser\/(\d+)/], ['firefox', /(?:Firefox|FxiOS)\/(\d+)/],
+          ['chrome', /(?:Chrome|CriOS)\/(\d+)/], ['safari', /Version\/(\d+).*Safari/]];
+        for (const [n, re] of tests) { const hit = ua.match(re); if (hit) { name = n; major = +hit[1]; break; } }
+        if (!name) name = /AppleWebKit/.test(ua) ? 'webkit' : 'other';
+      }
+      m.browser = name;
+      m.browser_v = major;
+      const inapp = /Twitter/.test(ua) ? 'x' : /LinkedInApp/.test(ua) ? 'linkedin' : /Instagram/.test(ua) ? 'instagram' : /FBAN|FBAV|FB_IAB|FBIOS/.test(ua) ? 'facebook' : '';
+      if (inapp) m.inapp = inapp;
+      m.cores = nav.hardwareConcurrency || 0;
+      if (nav.deviceMemory) m.memory_gb = nav.deviceMemory;
+      m.dpr = round(devicePixelRatio || 1, 100);
+      m.screen_wide = screen.width;
+      m.screen_high = screen.height;
+      const net = nav.connection;
+      if (net?.effectiveType) m.net = net.effectiveType;
+      if (net?.downlink != null) m.downlink = net.downlink;
+      m.webgpu = 'gpu' in nav;
+    } catch { /* what could be read is sent */ }
+    return m;
+  };
+
+  // What came over the network before the title (the game's own observer does the same).
+  const got = { bytes: 0, files: 0, cached: 0 };
+  let watching = null;
+  try {
+    watching = new PerformanceObserver(list => {
+      for (const e of list.getEntries()) {
+        if (e.name.startsWith(CAPTURE)) continue;
+        got.files++;
+        got.bytes += e.transferSize || 0;
+        // Less over the wire than its body: kept by the browser (0, or a 304's headers). A file
+        // from another origin without Timing-Allow-Origin shows neither and counts as neither.
+        if (e.encodedBodySize && e.transferSize < e.encodedBodySize) got.cached++;
+      }
+    });
+    watching.observe({ type: 'resource', buffered: true });
+  } catch { /* an old browser: no loading figures */ }
+
+  const detail = () => {
+    const d = game().detail;
+    if (!d) return {};
+    return { detail: d.level, detail_asked: ask.get('quality') || game().settings?.quality || '', scale: round(d.auto, 100) };
+  };
+
+  // Frames: a quarter-millisecond histogram up to 100 ms, and what is over it.
+  const BINS = 400, hist = new Uint32Array(BINS);
+  const drive = { on: false, of: -1, n: 0, long: 0, over: 0, overMs: 0, ms: 0, last: 0, auto: 1, steps: 0, looping: false };
+  const tick = now => {
+    drive.looping = false;
+    if (!drive.on || body.dataset.screen !== 'drive' || document.hidden) { drive.last = 0; return; }
+    const dt = drive.last ? now - drive.last : 0;
+    drive.last = now;
+    if (dt > 0 && dt < 1000) {
+      const bin = (dt * 4) | 0;
+      if (bin < BINS) hist[bin]++; else { drive.over++; drive.overMs += dt; }
+      drive.n++;
+      drive.ms += dt;
+      if (dt > 50) drive.long++;
+      const auto = game().detail?.auto ?? 1;
+      if (auto < drive.auto) drive.steps++;
+      drive.auto = auto;
+    }
+    drive.looping = true;
+    requestAnimationFrame(tick);
+  };
+  const loop = () => { if (!drive.looping && !document.hidden) { drive.looping = true; drive.last = 0; requestAnimationFrame(tick); } };
+  const begin = () => {
+    hist.fill(0);
+    Object.assign(drive, { on: true, of: game().started ?? 0, n: 0, long: 0, over: 0, overMs: 0, ms: 0, auto: game().detail?.auto ?? 1, steps: 0 });
+    loop();
+  };
+  const at = share => {
+    let want = Math.ceil(drive.n * share), seen = 0;
+    for (let b = 0; b < BINS; b++) { seen += hist[b]; if (seen >= want) return (b + 0.5) / 4; }
+    return drive.over ? drive.overMs / drive.over : 100;
+  };
+  const frames = () => {
+    try {
+      if (!drive.n) return { frames: 0, drive_s: 0, ...detail(), detail_steps: drive.steps };
+      return { fps: round(1000 / at(0.5)), fps_low: round(1000 / at(0.95)), long: round(drive.long / drive.n, 1000),
+        frames: drive.n, drive_s: round(drive.ms / 1000), ...detail(), detail_steps: drive.steps };
+    } catch { return {}; }
+  };
+  let last = {};
+  const end = finished => {
+    if (!drive.on) return;
+    drive.on = false;
+    try {
+      const state = game().state ?? {};
+      const laps = finished ? state.laps : Math.max(0, (state.lap ?? 1) - 1);
+      last = frames();
+      send('race_drive_end', { mode: body.dataset.mode, laps: laps ?? 0, finished, ...last });
+    } catch { /* never stops the game */ }
+  };
+
+  send('race_opened', { from, returning, wide: innerWidth, high: innerHeight, ...machine() });
+  document.addEventListener('race-count', ({ detail: d }) => send(d.event, { how: d.how, from: d.from }));
+
+  // Errors: the first one a visit, with no address or query in it.
+  let erred = false;
+  const error = what => {
+    if (erred) return;
+    try {
+      what = String(what ?? '');
+      if (what.includes('Using exceptions for control flow')) return;   // winit's, not an error
+      erred = true;
+      what = what.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s'")]+/gi, url => url.split(/[?#]/)[0].split('/').pop() || 'address')
+        .replace(/\?[^\s'")]*/g, '').slice(0, 200);
+      send('race_error', { what, screen: body.dataset.screen ?? '' });
+    } catch { /* never stops the game */ }
+  };
+  addEventListener('error', e => error(e.message || e.error));
+  addEventListener('unhandledrejection', e => error(e.reason?.message ?? e.reason));
+  document.addEventListener('race-error', e => error(e.detail));
+
+  let was = body.dataset.screen, titled = false, drove = false;
   new MutationObserver(() => {
-    const now = body.dataset.screen;
-    if (now === was) return;
-    if (!titled && was === 'loading') { titled = true; send('race_title'); }
-    // The mode is written a frame after the screen; a drive taken up again from the pause is not a new one.
-    if (now === 'drive' && was !== 'pause') setTimeout(() => { const mode = body.dataset.mode; if (body.dataset.screen === 'drive' && mode !== 'demo') send('race_started', { mode }); }, 1500);
-    if (now === 'result') setTimeout(() => send('race_finished', { mode: body.dataset.mode, place: document.querySelector('.place-big')?.textContent ?? '' }), 500);
-    was = now;
+    try {
+      const now = body.dataset.screen;
+      // A restart from the pause comes back to `drive` as a new race (game.started counts them).
+      if (now === 'drive' && drive.on && (game().started ?? 0) !== drive.of) end(false);
+      if (now === was) return;
+      if (!titled && was === 'loading') {
+        titled = true;
+        const gpu = game().detail?.gpu ?? {};
+        const cut = s => String(s ?? '').slice(0, 40);
+        try { watching?.disconnect(); } catch { /* as it is */ }
+        send('race_title', { returning, ...machine(), gpu_vendor: cut(gpu.vendor), gpu_arch: cut(gpu.arch), gpu_device: cut(gpu.device),
+          load_s: seconds(), mb: round(got.bytes / 1e6), files: got.files, cached: got.files > 0 && got.cached >= got.files * 0.9, ...detail() });
+      }
+      if (now === 'drive' && !drive.on) { begin(); drove = true; }
+      else if (now === 'drive') loop();
+      // Away from the drive and not to its pause or the pause's own menus: the drive is over.
+      if (drive.on && /^(result|qualified|title|race|trial|loading)$/.test(now)) end(!!(game().state?.finished));
+      // The mode is written a frame after the screen; a drive taken up again from the pause is not a new one.
+      if (now === 'drive' && was !== 'pause') setTimeout(() => { const mode = body.dataset.mode; if (body.dataset.screen === 'drive' && mode !== 'demo') send('race_started', { mode }); }, 1500);
+      if (now === 'result') setTimeout(() => send('race_finished', { mode: body.dataset.mode, place: document.querySelector('.place-big')?.textContent ?? '', ...last }), 500);
+      was = now;
+    } catch { /* never stops the game */ }
   }).observe(body, { attributes: true, attributeFilter: ['data-screen'] });
+
+  // Leaving: the first of the page hidden or closed (a phone seldom says it closed).
+  let left = false;
+  const leave = how => {
+    if (left) return;
+    left = true;
+    try {
+      send('race_left', { how, screen: body.dataset.screen ?? '', titled, drove, ...(drive.on ? { mode: body.dataset.mode, ...frames() } : {}) }, true);
+    } catch { /* never stops the game */ }
+  };
+  addEventListener('pagehide', () => leave('close'));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) leave('hide'); else loop(); });
 })();
 </script>
 </body></html>
