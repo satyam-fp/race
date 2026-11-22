@@ -26,7 +26,7 @@ window.raceDevice = () => {
   // The release's links (release.py writes them here): the program, the picture list and the
   // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
   // links in the page would be; a carded visitor gets them only on "Try it here anyway".
-  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.57c35f461e.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"}];
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.b47084e993.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"}];
   const lead = () => {
     for (const a of ahead) {
       const link = document.createElement('link');
@@ -160,10 +160,10 @@ body[data-mode=race] .trial-only{display:none!important}
 #map-other[data-kind=ghost]{fill:rgba(160,220,255,.6)}
 body.readout #map{display:none}
 #top{position:absolute;left:50%;top:1.4em;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.6em}
-#lights{display:flex;gap:.55em;padding:.55em .7em;background:#06080b;border:1px solid var(--edge);border-radius:.5em}
+#lights,.lights{display:flex;gap:.55em;padding:.55em .7em;background:#06080b;border:1px solid var(--edge);border-radius:.5em}
 #lights[data-on=no]{display:none}
-#lights i{width:2.1em;height:2.1em;border-radius:50%;background:#2a0b0a;box-shadow:inset 0 0 .5em #000}
-#lights i.lit{background:radial-gradient(circle at 40% 35%,#ff9a8f,var(--red) 55%,#b01208);box-shadow:0 0 1.4em rgba(255,59,48,.9)}
+#lights i,.lights i{width:2.1em;height:2.1em;border-radius:50%;background:#2a0b0a;box-shadow:inset 0 0 .5em #000}
+#lights i.lit,.lights i.lit{background:radial-gradient(circle at 40% 35%,#ff9a8f,var(--red) 55%,#b01208);box-shadow:0 0 1.4em rgba(255,59,48,.9)}
 .message{padding:.3em 1.2em .34em;font-weight:700;font-size:1.5em;letter-spacing:.06em;white-space:nowrap;
   background:var(--panel);border:1px solid var(--edge);border-radius:.3em;animation:arrive .18s ease-out}
 .message.best{color:var(--violet);border-color:var(--violet)}.message.note{color:var(--amber)}
@@ -302,9 +302,29 @@ body:not(.pad) .keys .for-keys,body:not(.pad) .tab-key .for-keys,body.pad .keys 
   .main{gap:.5em 1.4em}.headline{margin-bottom:.2em}.place-big{font-size:1.9em}.result{margin-bottom:.3em}.result td,.result th{padding:0 .4em}#suggest{line-height:1.25}}
 /* A tall narrow window: the note under the list. */
 @media (max-aspect-ratio:5/4){.main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 11em}.note{padding:.6em 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.14)}}
-#note{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.3em;color:var(--dim);background:#0b0d10}
+/* The loading screen (V11): what is being waited for behind it, darkened; the stage, the bar and
+   what is known of the time left; the warm-up (the race's own start lights) under it; a tip. */
+#note{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.3em;color:var(--dim);
+  background:#0b0d10;overflow:hidden;touch-action:manipulation;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 body:not([data-screen=loading]) #note{display:none}
-#note .loading{display:grid;gap:.6em;justify-items:center;letter-spacing:.06em}#note .bar{width:22em;height:.3em;background:#22272e}#note .bar i{display:block;height:100%;background:var(--red,#e10600)}
+#wait-back{position:absolute;inset:0;background:#0b0d10 center/cover no-repeat}
+#wait-back video{width:100%;height:100%;object-fit:cover;display:block}
+#wait-back::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(11,13,16,.5),rgba(11,13,16,.9) 80%)}
+#note>section{position:relative;display:grid;gap:.6em;justify-items:center;text-align:center;letter-spacing:.06em;width:min(30em,calc(100vw - 2em))}
+#wait-stage{color:var(--ink);font-weight:600}
+#note .bar{width:22em;max-width:100%;height:.3em;background:rgba(255,255,255,.14)}#note .bar i{display:block;height:100%;width:0;background:var(--red,#e10600);transition:width .2s linear}
+#note .bar.busy i{width:30%!important;animation:busy 1.6s ease-in-out infinite alternate;transition:none}
+@keyframes busy{from{transform:translateX(0)}to{transform:translateX(233%)}}
+#wait-calm{max-width:26em;font-size:.8em;line-height:1.35;letter-spacing:.03em;color:#c9d0d8}
+#warmup{margin-top:1.5em;gap:.45em}
+#warm-says{margin:0;max-width:25em;font-size:.82em;line-height:1.35;letter-spacing:.03em;color:#d3d9e0}
+#warmup .lights{font-size:1.05em;cursor:pointer}
+#warm-read{min-height:1.25em;font-weight:700;font-style:italic;font-size:1.5em;line-height:1.25;color:var(--ink)}
+#warm-read[data-kind=word]{font-style:normal;font-size:.95em;line-height:1.6;color:var(--amber)}
+#warm-best{min-height:1.2em;font-size:.72em;letter-spacing:.12em}
+#warmup.off .lights{opacity:.45;cursor:default}
+#wait-tip{margin-top:1.8em;min-height:1.3em;font-size:.78em;letter-spacing:.03em;color:#c9d0d8}
+@media (max-height:500px){#warmup{margin-top:.8em}#wait-tip{margin-top:.9em}}
 .near{position:fixed;top:42%;width:14px;height:16%;pointer-events:none;opacity:0;transition:opacity .15s}
 .near[data-side="left"]{left:0;background:linear-gradient(90deg,rgba(255,190,40,.9),rgba(255,190,40,0))}
 .near[data-side="right"]{right:0;background:linear-gradient(270deg,rgba(255,190,40,.9),rgba(255,190,40,0))}
@@ -424,7 +444,177 @@ html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.ca
 <div id="firstrun" hidden></div>
 
 <div id="menu" hidden></div>
-<div id="note">Loading…</div>
+<div id="note">
+  <div id="wait-back"></div>
+  <section>
+    <div id="wait-stage">Downloading the game</div>
+    <div class="bar"><i id="wait-bar"></i></div>
+    <div class="tag" id="wait-detail">&nbsp;</div>
+    <div id="wait-calm" hidden></div>
+  </section>
+  <section id="warmup">
+    <p id="warm-says">Warm up while it loads: the race starts under these lights. Press Space when they go out.</p>
+    <div class="lights" id="warm-lights"><i></i><i></i><i></i><i></i><i></i></div>
+    <div id="warm-read"></div>
+    <div class="tag" id="warm-best"></div>
+  </section>
+  <section id="wait-tip"></section>
+</div>
+<script>
+// The warm-up (V11, 2026-11-22): the race's own start lights on the loading screen, while the
+// page's thread is free (the files downloading). Five come on, one a second apart after the first
+// (0.8 s, as in a race), hold half a second to two, and go out; Space, a click or a tap reads the
+// reaction from the frame they went out in. A press while any is lit is a jump start; a try in
+// which a frame took over 100 ms from the fifth light on is not counted (the page was busy). It
+// stands down when the warm-up lap begins (the mark `lap-begun`), and is gone with
+// the loading screen: its listeners, timers and frames all stop, and `race_warmup` is counted once.
+// The backdrop and the tips are here too. Plain script, no file of its own.
+(() => {
+  // What is being waited for, behind it: the clip if there is one, its still as the poster and for
+  // when it has not come. Asked for when the program has been (DOMContentLoaded comes after the
+  // module script has asked), at low priority; the clip is paused when the program starts.
+  const BACKDROP = { still: 'wait.jpg', clip: 'assets/card/drive.mp4' };
+  const TIPS = [
+    'W or ↑ drives, S or ↓ brakes and reverses, A and D or ← and → steer.',
+    'Space is the handbrake. Escape pauses.',
+    'R puts you back on the road.',
+    'C changes the view: four of them, from far behind to the bumper.',
+    'Qualify for a grid place by your time, or race now from fifth.',
+    'After the Sweep, 520 m of straight into the Hairpin: the tightest corner of the lap.',
+    'Turn 1, the Esses, the Sweep, the Hairpin, the Chicane, then Turns 6, 7 and 8.',
+    'Seven rivals in the same car: places are won on the brakes and the line.',
+    'Time trial: flying laps against the ghost of your best, for gold, silver or bronze.',
+    'A gamepad works too: press any button on it.',
+    'M turns the sound off and on; F fills the screen.',
+  ];
+  const $ = id => document.getElementById(id);
+  const note = $('note'), box = $('warmup'), says = $('warm-says'), read = $('warm-read'), best = $('warm-best');
+  const lamps = [...$('warm-lights').children];
+  const W = window.warmup = { tries: 0, jumps: 0, busy: 0, best: null, ever: null, phase: 'rest', on: true };
+  try { const kept = +localStorage.getItem('race.warmup'); if (kept > 0) W.ever = kept; } catch { /* not kept */ }
+  let timer = 0, frame = 0, plan = null, lit = 0, last = 0, out = 0, stalled = false;
+  const sec = ms => `${(ms / 1000).toFixed(3)} s`;
+  const shown = () => { best.textContent = [W.best != null && `This visit ${sec(W.best)}`, W.ever != null && `Best ever ${sec(W.ever)}`].filter(Boolean).join('  ·  '); };
+  const light = n => { if (n !== lit) { lit = n; lamps.forEach((l, i) => l.classList.toggle('lit', i < n)); } };
+  const say = (text, word = false) => { read.textContent = text; read.dataset.kind = word ? 'word' : ''; };
+  const tick = t => {
+    frame = 0;
+    if (lit === 5 || W.phase === 'out') { if (last && t - last > 100) stalled = true; }
+    last = t;
+    if (W.phase === 'lights') {
+      if (t >= plan.out) { light(0); out = t; W.phase = 'out'; if (t - plan.out > 100) stalled = true; }
+      else light(t < plan.first ? 0 : Math.min(5, 1 + Math.floor((t - plan.first) / 800)));
+    } else if (W.phase === 'out' && t - out > 2500) {
+      W.phase = 'rest';
+      say('Press Space, or click, to light them again.', true);
+      return;
+    }
+    frame = requestAnimationFrame(tick);
+  };
+  const go = () => {
+    clearTimeout(timer);
+    cancelAnimationFrame(frame);
+    const now = performance.now();
+    plan = { first: now + 1000, out: now + 1000 + 4 * 800 + 500 + Math.random() * 1500 };
+    W.phase = 'lights'; stalled = false; last = 0; light(0); say('');
+    frame = requestAnimationFrame(tick);
+  };
+  const again = ms => { W.phase = 'rest'; timer = setTimeout(go, ms); };
+  const press = e => {
+    if (!W.on || window.lastError) return;
+    if (e.type === 'keydown') { if (e.code !== 'Space') return; e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return; }
+    else if (e.button > 0) return;
+    const at = e.timeStamp;
+    if (W.phase === 'lights' && lit > 0) {
+      cancelAnimationFrame(frame); light(0);
+      W.tries++; W.jumps++;
+      say('Jump start: you went before the lights went out. Again.', true);
+      return again(2000);
+    }
+    if (W.phase === 'out') {
+      cancelAnimationFrame(frame);
+      const ms = Math.round(at - out);
+      if (stalled) { W.busy++; say('The page was busy: again.', true); }
+      else if (ms < 100) { W.tries++; say('Under a tenth: a guess, not a reaction. Again.', true); }
+      else {
+        W.tries++;
+        say(sec(ms));
+        if (W.best == null || ms < W.best) W.best = ms;
+        if (W.ever == null || ms < W.ever) { W.ever = ms; try { localStorage.setItem('race.warmup', String(ms)); } catch { /* not kept */ } }
+        shown();
+      }
+      return again(2500);
+    }
+    if (W.phase === 'rest' || (W.phase === 'lights' && lit === 0)) go();
+  };
+  // A visitor shown the card (the head's first script) has none of it until "Try it here anyway".
+  const begin = () => {
+    if (!W.on) return;
+    addEventListener('keydown', press, true);
+    note.addEventListener('pointerdown', press);
+    timer = setTimeout(go, 1200);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', backdrop, { once: true }); else backdrop();
+  };
+  shown();
+
+  // The tips: one line, a new one every seven seconds, from a place chosen by chance.
+  let tip = Math.floor(Math.random() * TIPS.length);
+  const tips = () => { $('wait-tip').textContent = TIPS[tip++ % TIPS.length]; };
+  tips();
+  const turning = setInterval(tips, 7000);
+
+  // The backdrop.
+  let clip = null;
+  const backdrop = () => {
+    const url = name => window.assetUrl ? window.assetUrl(name) : name;
+    const still = new Image();
+    still.fetchPriority = 'low';
+    still.decoding = 'async';
+    still.onload = () => { $('wait-back').style.backgroundImage = `url("${still.src}")`; };
+    still.src = url(BACKDROP.still);
+    if (BACKDROP.clip && W.on) {
+      clip = Object.assign(document.createElement('video'), { muted: true, loop: true, playsInline: true, autoplay: true, preload: 'auto', poster: still.src, src: url(BACKDROP.clip) });
+      clip.setAttribute('muted', '');
+      $('wait-back').append(clip);
+    }
+  };
+  if (window.raceGo) window.raceGo.then(begin); else begin();
+
+  // Standing down: the program has started (the page's thread is the program's from now), or the
+  // page has failed. The lights stay dark; the best stays.
+  W.stop = why => {
+    if (!W.on) return;
+    W.on = false;
+    clearTimeout(timer); cancelAnimationFrame(frame);
+    removeEventListener('keydown', press, true);
+    note.removeEventListener('pointerdown', press);
+    light(0);
+    box.classList.add('off');
+    says.textContent = why;
+    if (W.phase === 'out' || W.phase === 'lights') say('');
+    W.phase = 'off';
+    try { clip?.pause(); } catch { /* as it is */ }
+  };
+  // The driver, 2026-11-22: on a slow line the circuit's download is most of the wait, and the
+  // program is already running through it; the lights stay until the warm-up lap begins (a try
+  // spoilt by a busy frame is not counted, as above).
+  const marked = () => performance.getEntriesByName('lap-begun', 'mark').length > 0;
+  const standDown = () => W.stop('The track is warming up, so the lights wait for the race: you will see them again on the grid.');
+  try { new PerformanceObserver((l, o) => { if (marked()) { o.disconnect(); standDown(); } }).observe({ type: 'mark' }); } catch { /* the program's start is seen below */ }
+  // Gone with the loading screen: counted once (`race-count`; the counter's listener is set up by
+  // the last script, long before the title), and nothing left running.
+  const ended = new MutationObserver(() => {
+    if (document.body.dataset.screen === 'loading') return;
+    ended.disconnect();
+    W.stop('');
+    clearInterval(turning);
+    if (clip) { clip.removeAttribute('src'); clip.load(); clip.remove(); }
+    document.dispatchEvent(new CustomEvent('race-count', { detail: { event: 'race_warmup', tries: W.tries, jumps: W.jumps, best_ms: W.best ?? 0 } }));
+  });
+  ended.observe(document.body, { attributes: true, attributeFilter: ['data-screen'] });
+  document.addEventListener('race-error', () => W.stop(''));
+})();
+</script>
 
 <script src="config.js"></script>
 <script>
@@ -517,6 +707,8 @@ const at = window.assetUrl;
 const from = name => new URL(at(name), document.baseURI).href;
 // A visitor shown the card (the head's first script) asks for nothing until "Try it here anyway".
 if (window.raceGo) await window.raceGo;
+// (Its bytes are not counted as they come: a response read by the page, or made again, is not
+// one the browser keeps the compiled program of, and a later visit would compile it again.)
 const program = navigator.gpu ? WebAssembly.compileStreaming(fetch('car_bg.wasm')) : null;
 program?.then(() => performance.mark('wasm-compiled'), () => {});
 // A release names the files the title waits for (`config.js`'s `first`, largest
@@ -550,7 +742,8 @@ const [, , car] = await Promise.all([
 ]);
 performance.mark('scripts-run');
 if (!program) failed('This browser has no WebGPU, which the game is drawn with.');
-else program.then(module => car.default({ module_or_path: module }))
+// From here the page's thread is the program's: the warm-up stands down at this mark.
+else program.then(module => { performance.mark('program-start'); return car.default({ module_or_path: module }); })
   .catch(e => { if (!String(e).includes('Using exceptions for control flow')) failed(e); });
 </script><script>
 // Counts players, namelessly (PostHog), and what their machines do. Only on the public address,
@@ -845,7 +1038,8 @@ else program.then(module => car.default({ module_or_path: module }))
   };
 
   send('race_opened', { from, returning, wide: innerWidth, high: innerHeight, ...machine() });
-  // game.js's race_shared {how, from}; the card's race_card {kind} and race_card_act {act, kind}.
+  // game.js's race_shared {how, from}; the card's race_card {kind} and race_card_act {act, kind};
+  // the loading screen's race_warmup {tries, jumps, best_ms}.
   document.addEventListener('race-count', ({ detail: { event, ...more } }) => send(event, more));
 
   // Errors: the first one a visit, with no address or query in it.
