@@ -368,4 +368,39 @@ performance.mark('scripts-run');
 if (!program) failed('This browser has no WebGPU, which the game is drawn with.');
 else program.then(module => car.default({ module_or_path: module }))
   .catch(e => { if (!String(e).includes('Using exceptions for control flow')) failed(e); });
-</script></body></html>
+</script><script>
+// Counts players, namelessly (PostHog): the page opened, the title reached, a drive begun, a
+// result reached, with the version. Only on the public address, or with ?count=1 (marked a
+// test). It sends four small messages and loads nothing; a blocked message changes nothing.
+(() => {
+  const forced = new URLSearchParams(location.search).get('count') === '1';
+  if (!forced && (location.hostname !== 'satyam-fp.github.io' || navigator.webdriver)) return;
+  const fresh = () => crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  let id;
+  try { id = localStorage.getItem('race.player'); if (!id) { id = fresh(); localStorage.setItem('race.player', id); } } catch { id = fresh(); }
+  const version = (location.pathname.match(/\/(v\d+)\//) ?? [0, 'dev'])[1];
+  let from = '';
+  try { from = document.referrer ? new URL(document.referrer).hostname : ''; } catch { /* no referrer */ }
+  const send = (event, more = {}) => {
+    try {
+      fetch('https://us.i.posthog.com/i/v0/e/', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: 'phc_CAun9nTMtAa6B7tecRUxt2piXvP6Q3LPCddXSDDNKPJy', event, distinct_id: id,
+          properties: { game: 'tachyon-sprint', version, $current_url: location.origin + location.pathname, $process_person_profile: false,
+            seconds: Math.round(performance.now() / 100) / 10, ...(forced ? { test: true } : {}), ...more } }) }).catch(() => {});
+    } catch { /* counting never stops the game */ }
+  };
+  send('race_opened', { from, webgpu: 'gpu' in navigator, wide: innerWidth, high: innerHeight });
+  const body = document.body;
+  let was = body.dataset.screen, titled = false;
+  new MutationObserver(() => {
+    const now = body.dataset.screen;
+    if (now === was) return;
+    if (!titled && was === 'loading') { titled = true; send('race_title'); }
+    // The mode is written a frame after the screen; a drive taken up again from the pause is not a new one.
+    if (now === 'drive' && was !== 'pause') setTimeout(() => { const mode = body.dataset.mode; if (body.dataset.screen === 'drive' && mode !== 'demo') send('race_started', { mode }); }, 1500);
+    if (now === 'result') setTimeout(() => send('race_finished', { mode: body.dataset.mode, place: document.querySelector('.place-big')?.textContent ?? '' }), 500);
+    was = now;
+  }).observe(body, { attributes: true, attributeFilter: ['data-screen'] });
+})();
+</script>
+</body></html>
