@@ -37,7 +37,7 @@ window.raceAdapter = () => window.raceAdapter.asked ??= (async () => {
   // The release's links (release.py writes them here): the program, the picture list and the
   // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
   // links in the page would be; a carded visitor gets them only on "Try it here anyway".
-  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.3582c5ca9f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.d8e80cc44d.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.3bb2cd2e38.js"}];
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.434a6e6de7.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.4e4c3a744d.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.abd6f3671c.js"}];
   const lead = () => {
     for (const a of ahead) {
       const link = document.createElement('link');
@@ -338,6 +338,13 @@ body:not([data-screen=loading]) #note{display:none}
 #note>section{position:relative;display:grid;gap:.6em;justify-items:center;text-align:center;letter-spacing:.06em;width:min(30em,calc(100vw - 2em))}
 #wait-stage{color:var(--ink);font-weight:600}
 #note .bar{width:22em;max-width:100%;height:.3em;background:rgba(255,255,255,.14)}#note .bar i{display:block;height:100%;width:0;background:var(--red,#e10600);transition:width .2s linear}
+#driver{display:grid;gap:.5em;justify-items:center;margin-top:1.2em;font-size:.8em;letter-spacing:.04em}
+#driver .driver-row{display:flex;gap:.5em;flex-wrap:wrap;justify-content:center}
+#driver input,#driver select,#driver button{font:inherit;color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);padding:.35em .6em;border-radius:3px}
+#driver input{width:9em;text-transform:uppercase}#driver select{max-width:14em}#driver select option{color:#000}
+#driver button{cursor:pointer}#driver #driver-card-go{background:var(--red,#e10600);border-color:transparent}
+table.board{width:100%;border-collapse:collapse;font-size:.85em}table.board td,table.board th{text-align:left;padding:.2em .4em;white-space:nowrap}
+table.board th{color:var(--dim)}table.board tr.you td{color:#fff;background:rgba(225,6,0,.35)}
 #note .bar.busy i{width:30%!important;animation:busy 1.6s ease-in-out infinite alternate;transition:none}
 @keyframes busy{from{transform:translateX(0)}to{transform:translateX(233%)}}
 #wait-calm{max-width:26em;font-size:.8em;line-height:1.35;letter-spacing:.03em;color:#c9d0d8}
@@ -546,7 +553,7 @@ html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.ca
   };
   const again = ms => { W.phase = 'rest'; timer = setTimeout(go, ms); };
   const press = e => {
-    if (!W.on || window.lastError) return;
+    if (!W.on || window.lastError || e.target?.closest?.('#driver')) return;
     if (e.type === 'keydown') { if (e.code !== 'Space') return; e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return; }
     else if (e.button > 0) return;
     const at = e.timeStamp;
@@ -810,6 +817,9 @@ else program.then(module => { performance.mark('program-start'); return car.defa
 //                   screen, panic (the program's last console.error, a panic's own words), the GPU's
 //                   facts, gpu_lost and gpu_error; before the title, where the loading was (below)
 //   race_shared     how, from (sent by game.js through a `race-count` event)
+//   race_driver     given (true, or false for Skip), country: the driver card (game.js; never the name)
+//   race_lap_sent   accepted, reason: a lap sent to the leaderboards and the server's answer (game.js)
+//   race_board      scope (world, country, mine): the Leaderboard screen and each page of it (game.js)
 //   race_card       kind (phone, inapp, nowebgpu, noadapter): the card shown instead of the game (the page's own
 //                   script, through `race-count`); race_card_act: act (send, copy, anyway), kind
 // Every message has game, version (v0, v1, v2 from the address, else dev) and seconds since the
