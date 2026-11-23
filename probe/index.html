@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Tachyon Sprint</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Before anything heavy is asked for: who is shown the card instead of the game (MOBILE.md,
+// stage (a)). A phone or tablet, an app's own browser, or a browser without WebGPU cannot play
+// today (no touch controls; a phone's browser kills a page that holds 2 GB), so it fetches
+// nothing of the game: no program, no picture, no preload, until "Try it here anyway".
+// `raceDevice` is the one test of a phone, used by the card and by the counter at the end.
+window.raceDevice = () => {
+  const d = { mobile: false, inapp: '', ipad: false, webgpu: false };
+  try {
+    const nav = navigator, ua = nav.userAgent || '';
+    const has = q => { try { return matchMedia(q).matches; } catch { return false; } };
+    d.ipad = /Macintosh/.test(ua) && nav.maxTouchPoints > 1;
+    d.mobile = !!(nav.userAgentData?.mobile || (has('(pointer: coarse)') && !has('(any-pointer: fine)')) || /Android|iPhone|iPad|iPod|Mobi/.test(ua) || d.ipad);
+    d.inapp = /Twitter/.test(ua) ? 'x' : /LinkedInApp/.test(ua) ? 'linkedin' : /Instagram/.test(ua) ? 'instagram' : /FBAN|FBAV|FB_IAB|FBIOS/.test(ua) ? 'facebook' : '';
+    d.webgpu = 'gpu' in nav;
+  } catch { /* what could be read */ }
+  return d;
+};
+(() => {
+  const d = window.raceDevice();
+  // `card`: 'inapp', 'phone', 'nowebgpu', or '' for the game.
+  const card = window.raceCard = d.inapp ? 'inapp' : d.mobile ? 'phone' : !d.webgpu ? 'nowebgpu' : '';
+  // The release's links (release.py writes them here): the program, the picture list and the
+  // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
+  // links in the page would be; a carded visitor gets them only on "Try it here anyway".
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.b47084e993.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"}];
+  const lead = () => {
+    for (const a of ahead) {
+      const link = document.createElement('link');
+      for (const k in a) link.setAttribute(k, a[k]);
+      document.head.append(link);
+    }
+  };
+  if (!card) { lead(); return; }
+  const root = document.documentElement, port = document.querySelector('meta[name=viewport]');
+  root.classList.add('carded');
+  port.content += ', viewport-fit=cover';
+  // The page's module waits on this (below); "Try it here anyway" lets it go.
+  window.raceGo = new Promise(go => {
+    window.raceAnyway = () => {
+      root.classList.remove('carded');
+      port.content = port.content.replace(', viewport-fit=cover', '');
+      window.raceAnyway = () => {};
+      lead();
+      go();
+    };
+  });
+})();
+</script>
+<style>
+/* Sizes follow the window (its height, or its width when it is narrow), so
+   the display reads the same at 1280 by 720 as in full screen. */
+:root{--u:clamp(8px,min(1.95vh,1.25vw),26px);--ink:#f4f6f8;--dim:#aab3bf;--panel:rgba(9,12,17,.78);--edge:rgba(255,255,255,.14);
+  --red:#ff3b30;--green:#32e08a;--amber:#ffc83d;--violet:#c58bff;--blue:#4db8ff}
+html,body{margin:0;height:100%;background:#0b0d10;color:var(--ink);overflow:hidden;
+  font:500 var(--u)/1.25 "Avenir Next Condensed","DIN Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;user-select:none}
+#wrap{position:fixed;inset:0}
+canvas{width:100%;height:100%;display:block;outline:none}
+[hidden]{display:none!important}
+
+/* ------------------------------------------------------------ display */
+#hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .25s}
+body.driving #hud{opacity:1}
+html.clean #hud{display:none}
+.block{position:absolute;background:var(--panel);border:1px solid var(--edge);border-radius:.35em;
+  box-shadow:0 .2em 1.2em rgba(0,0,0,.35)}
+.tag{font-size:.72em;font-weight:600;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.big{font-weight:700;font-style:italic;line-height:.9}
+
+#standing{left:1.6em;top:1.4em;display:flex;align-items:stretch;overflow:hidden}
+#standing>div{padding:.55em 1.1em .6em;display:flex;flex-direction:column;justify-content:center}
+#standing>div+div{border-left:1px solid var(--edge)}
+#standing .big{font-size:2.9em}
+#standing small{font-size:.42em;font-style:normal;font-weight:600;color:var(--dim);margin-left:.12em}
+body[data-mode=trial] .race-only{display:none!important}
+body[data-mode=race] .trial-only{display:none!important}
+#place-box{background:var(--red);color:#fff}
+#place-box .tag,#place-box small{color:rgba(255,255,255,.85)}
+#trial-box .big{font-size:1.5em;font-style:normal;letter-spacing:.06em}
+#target{font-weight:700;font-size:1.15em}
+#target[data-kind=gold],.medal.gold{color:#ffd24a}#target[data-kind=silver],.medal.silver{color:#d5dde6}#target[data-kind=bronze],.medal.bronze{color:#e39a5c}
+#ghost{font-size:.72em;letter-spacing:.12em;color:var(--blue);font-weight:600}
+
+/* The order of the field (H10): a row a car, drawn straight on the picture
+   as the references' towers are; each row is moved to its place, so cars
+   are seen to change places. Under it the gaps on the road (H4). */
+#order{position:absolute;left:1.6em;top:7.1em;width:16.4em}
+#tower{position:relative;font-size:.95em;--row:1.74em}
+#tower .car{position:absolute;left:0;right:0;top:0;height:1.6em;display:flex;align-items:center;font-weight:600;
+  background:linear-gradient(90deg,rgba(9,12,17,.9),rgba(9,12,17,.66));transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+#tower .car b{flex:none;width:1.75em;align-self:stretch;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-style:italic;background:rgba(255,255,255,.1)}
+#tower .car i{flex:none;width:.3em;align-self:stretch;background:var(--c)}
+#tower .car u{flex:none;width:1.9em;text-align:right;text-decoration:none;font-size:.8em;font-weight:700;color:var(--dim)}
+#tower .car span{flex:1;padding-left:.5em;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+#tower .car em{flex:none;padding-right:.6em;font-style:normal;font-size:.92em;font-variant-numeric:tabular-nums;color:#dfe5ec}
+#tower .car em[data-kind=word]{font-size:.7em;letter-spacing:.14em;color:var(--dim)}
+#tower .car.you{background:#f4f6f8;color:#0b0d10;z-index:1}
+#tower .car.you b{background:var(--red);color:#fff}#tower .car.you u{color:#4a525e}#tower .car.you em{color:#0b0d10}
+#tower .car[data-state=out] span,#tower .car[data-state=out] u{opacity:.5}
+#tower .car[data-state=finished] em::before{content:"";display:inline-block;width:.8em;height:.8em;margin-right:.4em;vertical-align:-.08em;
+  background:conic-gradient(#fff 25%,#111 0 50%,#fff 0 75%,#111 0) 0 0/.4em .4em}
+#gaps{display:flex;gap:.4em;margin-top:.45em}
+#gaps>div{flex:1;display:flex;align-items:baseline;justify-content:space-between;gap:.4em;padding:.28em .6em .3em;white-space:nowrap;
+  background:linear-gradient(90deg,rgba(9,12,17,.9),rgba(9,12,17,.66))}
+#gaps>div:has([data-kind=none]){visibility:hidden}
+#gaps .tag{font-size:.74em;letter-spacing:.1em}
+#gap-ahead,#gap-behind{font-weight:700;font-size:1.2em;font-variant-numeric:tabular-nums}
+#gap-ahead{color:var(--amber)}#gap-behind{color:var(--green)}
+#pen-row span:last-child{color:var(--amber)}#pen-row[hidden]{display:none}
+#pen-why{margin-left:.3em;font-style:normal;letter-spacing:.04em;text-transform:none;color:var(--amber);white-space:nowrap}
+
+#timing{right:1.6em;top:1.4em;padding:.6em 1.1em .7em;min-width:13.5em}
+#timing .row{display:flex;justify-content:space-between;align-items:baseline;gap:1.4em}
+#timing .row span:last-child{font-weight:700;font-size:1.25em}
+#timing .now span:last-child{font-size:2.05em;font-style:italic}
+#delta{display:block;margin:.35em 0 .1em;padding:.12em .6em;border-radius:.25em;text-align:right;font-weight:700;font-size:1.45em}
+#delta[data-kind=none]{display:none}
+#delta[data-kind=ahead]{background:rgba(50,224,138,.18);color:var(--green)}
+#delta[data-kind=behind]{background:rgba(255,59,48,.2);color:#ff7168}
+#delta[data-kind=level]{background:rgba(255,255,255,.1)}
+#sectors{display:flex;gap:.3em;margin-top:.5em}
+#sectors div{flex:1;text-align:center;padding:.18em 0 .22em;border-radius:.2em;background:rgba(255,255,255,.07);border-bottom:.18em solid transparent}
+#sectors b{display:block;font-size:.62em;letter-spacing:.14em;color:var(--dim);font-weight:600}
+#sectors span{font-weight:700;font-size:.95em}
+#sectors span[data-kind=best]{color:var(--violet)}#sectors div:has(span[data-kind=best]){border-color:var(--violet)}
+#sectors span[data-kind=slower]{color:var(--amber)}#sectors div:has(span[data-kind=slower]){border-color:var(--amber)}
+#sectors div:has(span[data-kind=now]){border-color:var(--ink)}
+#sectors div.last-lap{opacity:.7}
+
+#dash{right:1.6em;bottom:1.5em;padding:.7em 1.1em .8em;width:17em}
+#leds{display:flex;gap:.22em;margin-bottom:.55em}
+#leds i{flex:1;height:.55em;border-radius:.14em;background:rgba(255,255,255,.12)}
+#leds i.low{background:var(--green);box-shadow:0 0 .5em var(--green)}
+#leds i.mid{background:var(--amber);box-shadow:0 0 .5em var(--amber)}
+#leds i.high{background:var(--red);box-shadow:0 0 .5em var(--red)}
+#leds i.change{background:var(--blue);box-shadow:0 0 .7em var(--blue)}
+#dial{display:flex;align-items:flex-end;justify-content:space-between}
+#gear-box{width:3.3em;height:3.6em;border:.14em solid var(--ink);border-radius:.4em;display:flex;align-items:center;justify-content:center}
+#gear{font-size:3em}
+#speed{font-size:4.6em;text-align:right;min-width:2.2em}
+#speed-box{text-align:right}
+#revs{position:relative;height:.5em;margin-top:.6em;border-radius:.25em;background:rgba(255,255,255,.12);overflow:hidden}
+#revs-fill{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#e9eef4,#fff)}
+#revs-red{position:absolute;top:0;bottom:0;right:0;background:rgba(255,59,48,.55);mix-blend-mode:screen}
+#revs-row{display:flex;justify-content:space-between;margin-top:.25em}
+
+#map{left:1.6em;bottom:1.5em;width:11.5em;height:11.5em;padding:.5em;background:rgba(8,10,14,.5)}
+#map svg{width:100%;height:100%;overflow:visible}
+#map-road{fill:none;stroke:rgba(255,255,255,.92);stroke-width:2.6;stroke-linejoin:round;stroke-linecap:round}
+#map-line{fill:none;stroke:#fff;stroke-width:5;stroke-linecap:butt}
+#map-me{fill:var(--red);stroke:#fff;stroke-width:1.2}
+#map-cars circle{stroke:rgba(0,0,0,.75);stroke-width:.8}
+#map-other{fill:var(--blue);stroke:#fff;stroke-width:1}
+#map-other[data-kind=none]{display:none}
+#map-other[data-kind=ghost]{fill:rgba(160,220,255,.6)}
+body.readout #map{display:none}
+#top{position:absolute;left:50%;top:1.4em;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.6em}
+#lights,.lights{display:flex;gap:.55em;padding:.55em .7em;background:#06080b;border:1px solid var(--edge);border-radius:.5em}
+#lights[data-on=no]{display:none}
+#lights i,.lights i{width:2.1em;height:2.1em;border-radius:50%;background:#2a0b0a;box-shadow:inset 0 0 .5em #000}
+#lights i.lit,.lights i.lit{background:radial-gradient(circle at 40% 35%,#ff9a8f,var(--red) 55%,#b01208);box-shadow:0 0 1.4em rgba(255,59,48,.9)}
+.message{padding:.3em 1.2em .34em;font-weight:700;font-size:1.5em;letter-spacing:.06em;white-space:nowrap;
+  background:var(--panel);border:1px solid var(--edge);border-radius:.3em;animation:arrive .18s ease-out}
+.message.best{color:var(--violet);border-color:var(--violet)}.message.note{color:var(--amber)}
+.message.warn{color:#ff7168;border-color:var(--red)}.message.flag{background:#fff;color:#0b0d10;font-size:2em}
+@keyframes arrive{from{opacity:0;transform:translateY(-.4em)}}
+#wrong{padding:.3em 1.4em;font-weight:700;font-size:2.2em;letter-spacing:.1em;background:var(--red);color:#fff;border-radius:.3em}
+/* A way back, offered to a car that is stuck or turned round (D11). */
+#wayback{position:absolute;left:50%;top:31%;transform:translateX(-50%);display:flex;align-items:center;gap:1em;padding:.5em 1.1em .55em;
+  white-space:nowrap;font-weight:700;font-size:1.45em;letter-spacing:.08em;text-transform:uppercase;background:var(--panel);
+  border:1px solid var(--edge);border-left:.24em solid var(--amber);border-radius:.3em;animation:offered .2s ease-out}
+#wayback kbd{display:inline-block;min-width:1.1em;margin-right:.2em;padding:.04em .42em .08em;font:inherit;letter-spacing:.02em;text-align:center;
+  color:#0b0d10;background:#fff;border-radius:.22em;box-shadow:0 .14em 0 rgba(0,0,0,.5)}
+#way-reverse{padding-left:1em;border-left:1px solid var(--edge);color:#d3d9e0}
+@keyframes offered{from{opacity:0}}
+/* What the car has struck (D13): a plan of it, nose up, a mark a hit. */
+#damage{right:21.2em;bottom:1.5em;padding:.5em .7em .55em;display:flex;flex-direction:column;align-items:center;gap:.3em}
+#damage svg{width:4.8em;height:9.6em;display:block;overflow:visible}
+#damage-car{fill:rgba(255,255,255,.16);stroke:rgba(255,255,255,.85);stroke-width:.07}
+#damage-svg .glass{fill:rgba(255,255,255,.2)}#damage-svg .tyre{fill:rgba(255,255,255,.75)}
+#damage-svg .wing{fill:none;stroke:rgba(255,255,255,.85);stroke-width:.12;stroke-linecap:round}
+#damage-marks circle{fill-opacity:.8;stroke:rgba(0,0,0,.6);stroke-width:.04}
+#damage-marks circle[data-heavy=true]{stroke:#fff;stroke-width:.07}
+#worn{color:#ff7168;letter-spacing:.1em}#worn:empty{display:none}
+html.clean #wayback,html.clean #damage{display:none}
+#pause-button{position:absolute;left:50%;bottom:1.5em;transform:translateX(-50%);pointer-events:auto;cursor:pointer;
+  padding:.3em .9em;font:inherit;font-size:.8em;font-weight:600;letter-spacing:.14em;color:var(--dim);background:var(--panel);
+  border:1px solid var(--edge);border-radius:.3em}
+#pause-button{opacity:0;transition:opacity .2s}body.pointing #pause-button,#pause-button:hover{opacity:1}
+#pause-button:hover{color:#0b0d10;background:#fff}
+body:not([data-screen=drive]) #pause-button{display:none}
+#notice{position:fixed;left:50%;top:1.4em;transform:translateX(-50%);padding:.35em 1.2em;font-weight:700;letter-spacing:.1em;
+  color:var(--amber);background:var(--panel);border:1px solid var(--edge);border-radius:.3em;z-index:3}
+/* Auto detail's notice: a sentence. Driving, low in the middle, clear of the lights, the timing,
+   the tower, the map and the dash; on a menu, at the foot of the scenery beside the panel. */
+#notice.detail{top:auto;bottom:5.2em;width:max-content;max-width:min(30em,calc(100vw - 2em));font-size:var(--u);font-weight:600;
+  letter-spacing:.02em;line-height:1.4;color:var(--ink);border-left:.24em solid var(--amber)}
+body:not([data-screen=drive]):not([data-screen=pause]) #notice.detail{left:auto;right:1.6em;bottom:1.5em;transform:none;max-width:min(24em,calc(100vw - 2em))}
+html.clean #notice.detail{display:none}
+/* The frame rate: below the dash in the bottom right corner, on the title and while driving. */
+#fps{display:none;position:fixed;right:1.6em;bottom:.25em;font-size:.95em;font-weight:700;letter-spacing:.06em;color:var(--ink);opacity:.9;text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.6);pointer-events:none;z-index:2}
+body.show-fps[data-screen=title] #fps,body.show-fps[data-screen=drive] #fps{display:block}
+html.clean #fps{display:none!important}
+#readout{display:none;position:absolute;left:1.6em;bottom:1.5em;padding:.5em .8em;font:11px/1.5 ui-monospace,Menlo,monospace;white-space:pre;background:var(--panel);border-radius:.3em}
+body.readout #readout{display:block}
+
+/* -------------------------------------------------------------- menus */
+/* One frame for every screen (F5 to F13): a panel of one size, in one
+   place, whatever is chosen; in it the title, the tabs of a screen with
+   pages, the list beside the chosen item's note, and the keys' line. Its
+   own unit follows the window, never under 12 px. The panel is dark
+   enough that its text reads over a white frame (F10). */
+#menu{position:fixed;inset:0;--m:clamp(12px,min(2.1vh,1.3vw),28px);--w:min(44em,calc(100vw - 2em));font-size:var(--m);
+  background:linear-gradient(90deg,rgba(8,10,14,.95) calc(max(1em,5vw) + var(--w)),rgba(8,10,14,.45) calc(max(1em,5vw) + var(--w) + 10em),rgba(8,10,14,.08) calc(max(1em,5vw) + var(--w) + 26em))}
+body[data-screen=pause] #menu,body[data-screen=qualified] #menu,body[data-screen=result] #menu{background:linear-gradient(90deg,rgba(8,10,14,.95) calc(max(1em,5vw) + var(--w)),rgba(8,10,14,.6) calc(max(1em,5vw) + var(--w) + 10em))}
+.card{position:absolute;left:max(1em,5vw);top:0;bottom:0;margin:auto 0;height:min(88vh,38em);width:var(--w);box-sizing:border-box;
+  display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;padding:1.2em 0 .9em}
+.card>header{grid-row:1}.card>.tabs{grid-row:2}.card>.main{grid-row:3}.card>.keys{grid-row:4}
+.card h1{margin:0;font-size:2.3em;font-style:italic;font-weight:800;letter-spacing:.02em;line-height:1}
+.card h1::after{content:"";display:block;width:2em;height:.1em;background:var(--red);margin:.22em 0 .3em}
+.lead{margin:-.1em 0 .7em;color:#c9d0d8;font-size:1.1em}
+/* The pages of a screen: Q and E (or LB and RB) at either end. */
+.tabs{display:flex;align-items:stretch;gap:.3em;margin:0 0 .7em}
+.tab{flex:1 1 auto;min-width:0;font:inherit;font-weight:700;padding:.4em .2em;color:#dfe4ea;cursor:pointer;white-space:nowrap;overflow:hidden;
+  background:rgba(255,255,255,.07);border:0;border-bottom:.2em solid transparent;border-radius:.18em .18em 0 0}
+.tab.on{color:#fff;background:rgba(255,255,255,.16);border-bottom-color:var(--red)}
+.tab-key{display:flex;align-items:center;cursor:pointer}
+.main{display:grid;grid-template-columns:minmax(0,23em) minmax(0,1fr);gap:1.4em;min-height:0}
+/* The two results: the sheet across the panel, the choices in a row under it. */
+body[data-screen=qualified] .main,body[data-screen=result] .main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:.8em}
+body[data-screen=qualified] .list,body[data-screen=result] .list{grid-row:2;flex-direction:row}
+body[data-screen=qualified] .list .item,body[data-screen=result] .list .item{flex:1 1 0;min-width:0}
+body[data-screen=soundtest] .main{grid-template-columns:minmax(0,29em) minmax(0,1fr)}
+/* What starts or resumes: set apart from the settings under it, a play mark before it. */
+.item.go{font-weight:800;letter-spacing:.03em}.item.go .label::before{content:"▶";display:inline-block;width:1.1em;font-size:.75em;color:var(--red);vertical-align:.08em}
+.item.go.last{margin-bottom:.7em}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.3em;min-height:0;overflow:hidden}
+.item{flex:none;position:relative;display:flex;align-items:center;justify-content:space-between;gap:.6em;height:2.25em;padding:0 .5em 0 1em;box-sizing:border-box;
+  font-size:1.15em;font-weight:600;cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.07);border-radius:.18em}
+/* The choice: light on dark the other way round, and a bar only it has (F8). */
+.item .mark{position:absolute;left:0;top:0;bottom:0;width:.3em;background:var(--red);border-radius:.18em 0 0 .18em;visibility:hidden}
+.item.on{background:#fff;color:#0b0d10}.item.on .mark{visibility:visible}
+.item.off{color:#a3acb8;cursor:default;background:rgba(255,255,255,.03)}
+.label{overflow:hidden;text-overflow:ellipsis}
+.value{flex:none;display:flex;align-items:center;justify-content:flex-end;font-weight:500;max-width:62%}
+.value>span{overflow:hidden;text-overflow:ellipsis}
+/* A value between its arrows keeps one width, so the arrows stay put (F5). */
+.turns .value{width:9em;display:grid;grid-template-columns:1.6em minmax(0,1fr) 1.6em;text-align:center}
+.value b{font-weight:800;font-size:1.25em;line-height:1;text-align:center;color:#c9d0d8;cursor:pointer}.item.on .value b{color:var(--red)}
+.value .number{display:inline-block;width:1.4em;margin-left:.3em;font-style:normal;text-align:right}
+/* A volume: a bar filled to its level, then its number. */
+.value .bar{display:inline-block;width:4.6em;height:.5em;vertical-align:.12em;border-radius:.25em;border:1px solid currentColor;
+  background:linear-gradient(90deg,currentColor calc(var(--v) * 10%),transparent 0)}.turns .value .bar{width:3.6em}
+.note{min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:.1em 0 0 1.3em;border-left:1px solid rgba(255,255,255,.14)}
+.note h2{margin:0 0 .45em;font-size:1.15em;font-weight:700;line-height:1.2}
+.note p{margin:0 0 .6em;line-height:1.4;color:#e1e6eb}
+.note-foot{margin-top:auto;padding-top:.5em;border-top:1px solid rgba(255,255,255,.14)}
+.note-foot h3{margin:0 0 .3em;font-size:1em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c9d0d8}
+.note-foot p{margin:0 0 .3em;color:#d3d9e0}
+.facts{display:flex;flex-wrap:wrap;gap:.3em 1.4em}.facts b{color:#fff;font-size:1.15em;margin-left:.3em}
+.medal i{display:inline-block;width:.7em;height:.7em;border-radius:50%;background:currentColor;margin-right:.4em}
+em.medal{font-style:normal;font-weight:700;margin-left:.8em}
+/* The keys' line: each key in a cap, the one that goes back a button (F9). */
+.keys{display:flex;flex-wrap:wrap;align-items:center;gap:.35em 1.3em;margin:.8em 0 0;padding-top:.7em;border-top:1px solid rgba(255,255,255,.14);
+  font-size:1em;font-weight:600;color:#e1e6eb}
+.keys>span,.keys .back>span,.tab-key>span{display:inline-flex;align-items:center;gap:.4em;white-space:nowrap}
+.tab-key kbd{font-size:1em!important}
+.keys kbd,.tab-key kbd{display:inline-block;min-width:1.3em;margin-right:.15em;padding:.05em .35em;box-sizing:border-box;font:inherit;font-weight:800;font-size:.95em;text-align:center;
+  color:#0b0d10;background:#e9edf1;border-radius:.2em}
+.keys .back{margin-left:auto;font:inherit;color:inherit;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:.25em;padding:.2em .6em;cursor:pointer}
+.keys .back:hover{background:rgba(255,255,255,.18)}
+.for-pad{display:none}body.pad .for-pad{display:inline}body.pad .for-keys{display:none}
+.keys .for-keys,.keys .for-pad,.tab-key .for-keys,.tab-key .for-pad{display:none}
+body:not(.pad) .keys .for-keys,body:not(.pad) .tab-key .for-keys,body.pad .keys .for-pad,body.pad .tab-key .for-pad{display:inline-flex}
+#driver-name{font:inherit;font-weight:700;letter-spacing:.08em;text-transform:uppercase;width:7.6em;padding:.05em .4em;color:inherit;cursor:text;
+  background:transparent;border:1px solid transparent;border-bottom:1px dashed currentColor;border-radius:.2em;outline:none;text-align:right}
+#driver-name:focus{text-align:left;border-color:var(--red);background:#fff;color:#0b0d10;box-shadow:0 0 0 2px var(--red)}
+/* The results: the place first and largest, then the table. */
+.sheet{padding:0;border:0}
+.headline{display:flex;align-items:baseline;flex-wrap:wrap;gap:.2em .7em;margin:0 0 .5em}
+.place-big{font-size:3em;font-weight:800;font-style:italic;line-height:.95}
+.sum{color:#e1e6eb}.sum b{color:#fff}
+.result{width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 .7em}
+.result .c-place{width:2.2em}.result .c-time{width:6.8em}.result .c-gap{width:5.2em}
+.result th{text-align:right;font-size:1em;font-weight:700;letter-spacing:.1em;color:#c9d0d8;text-transform:uppercase;padding:.2em .5em}
+.result th:nth-child(2){text-align:left}
+.result td{text-align:right;padding:.22em .5em;font-weight:600;border-top:1px solid rgba(255,255,255,.14);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.result td i{display:inline-block;min-width:1.7em;margin-right:.5em;padding:0 .2em;font-style:normal;font-size:1em;text-align:center;
+  border-left:.3em solid var(--c);background:rgba(255,255,255,.12)}
+.result td small{color:#c9d0d8;font-weight:500}.result .c-pen{width:12em}.result td small.pen{font-size:.8em}
+.result td:nth-child(2){text-align:left}.result td:first-child{font-style:italic;font-weight:800;text-align:center}
+.result tr.you td{background:#fff;color:#0b0d10}.result tr.you td small{color:#3a424d}.result tr.you td i{background:rgba(0,0,0,.08)}
+.result td.fastest{color:var(--violet)}.result tr.you td.fastest{color:#6d2bb3}
+#suggest{margin:0;line-height:1.4;color:#e1e6eb}
+/* A short window: the title and the results drawn tighter. */
+@media (max-height:500px){.card{height:96vh;padding-top:.7em}.card h1{font-size:1.9em}.lead{margin-bottom:.4em}.item{height:2em}.keys{margin-top:.5em;padding-top:.45em}
+  .main{gap:.5em 1.4em}.headline{margin-bottom:.2em}.place-big{font-size:1.9em}.result{margin-bottom:.3em}.result td,.result th{padding:0 .4em}#suggest{line-height:1.25}}
+/* A tall narrow window: the note under the list. */
+@media (max-aspect-ratio:5/4){.main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 11em}.note{padding:.6em 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.14)}}
+/* The loading screen (V11): what is being waited for behind it, darkened; the stage, the bar and
+   what is known of the time left; the warm-up (the race's own start lights) under it; a tip. */
+#note{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.3em;color:var(--dim);
+  background:#0b0d10;overflow:hidden;touch-action:manipulation;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+body:not([data-screen=loading]) #note{display:none}
+#wait-back{position:absolute;inset:0;background:#0b0d10 center/cover no-repeat}
+#wait-back video{width:100%;height:100%;object-fit:cover;display:block}
+#wait-back::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(11,13,16,.5),rgba(11,13,16,.9) 80%)}
+#note>section{position:relative;display:grid;gap:.6em;justify-items:center;text-align:center;letter-spacing:.06em;width:min(30em,calc(100vw - 2em))}
+#wait-stage{color:var(--ink);font-weight:600}
+#note .bar{width:22em;max-width:100%;height:.3em;background:rgba(255,255,255,.14)}#note .bar i{display:block;height:100%;width:0;background:var(--red,#e10600);transition:width .2s linear}
+#note .bar.busy i{width:30%!important;animation:busy 1.6s ease-in-out infinite alternate;transition:none}
+@keyframes busy{from{transform:translateX(0)}to{transform:translateX(233%)}}
+#wait-calm{max-width:26em;font-size:.8em;line-height:1.35;letter-spacing:.03em;color:#c9d0d8}
+#warmup{margin-top:1.5em;gap:.45em}
+#warm-says{margin:0;max-width:25em;font-size:.82em;line-height:1.35;letter-spacing:.03em;color:#d3d9e0}
+#warmup .lights{font-size:1.05em;cursor:pointer}
+#warm-read{min-height:1.25em;font-weight:700;font-style:italic;font-size:1.5em;line-height:1.25;color:var(--ink)}
+#warm-read[data-kind=word]{font-style:normal;font-size:.95em;line-height:1.6;color:var(--amber)}
+#warm-best{min-height:1.2em;font-size:.72em;letter-spacing:.12em}
+#warmup.off .lights{opacity:.45;cursor:default}
+#wait-tip{margin-top:1.8em;min-height:1.3em;font-size:.78em;letter-spacing:.03em;color:#c9d0d8}
+@media (max-height:500px){#warmup{margin-top:.8em}#wait-tip{margin-top:.9em}}
+.near{position:fixed;top:42%;width:14px;height:16%;pointer-events:none;opacity:0;transition:opacity .15s}
+.near[data-side="left"]{left:0;background:linear-gradient(90deg,rgba(255,190,40,.9),rgba(255,190,40,0))}
+.near[data-side="right"]{right:0;background:linear-gradient(270deg,rgba(255,190,40,.9),rgba(255,190,40,0))}
+.near[data-kind="close"]{opacity:.55}
+.near[data-kind="level"]{opacity:1;filter:hue-rotate(-30deg) saturate(1.6)}
+body:not(.driving) .near,.clean .near{display:none}
+#firstrun{position:fixed;right:1.6em;top:16.5em;background:rgba(10,12,16,.82);color:#fff;
+  padding:.8em 1.2em;border-left:4px solid #e8402a;font-weight:600;font-size:.82em;line-height:1.7;letter-spacing:.06em;max-width:19em;text-align:left}
+#firstrun span{display:block}#firstrun span i{font-style:normal;white-space:nowrap;display:block}
+#firstrun b{display:block;font-size:15px;letter-spacing:.12em;text-transform:uppercase}
+#firstrun em{display:block;font-style:normal;opacity:.7;font-weight:500;letter-spacing:.02em}
+.clean #firstrun{display:none}
+
+/* --------------------------------------------------------------- card */
+/* What a phone, an app's browser or a browser without WebGPU is shown instead of the game
+   (the script at the top of the head): the game moving, its name, one line, and the link
+   to keep for a computer. Portrait: one column; a wide screen: the film beside the words. */
+#card{display:none}
+html.carded #card{position:fixed;inset:0;z-index:20;display:flex;overflow-y:auto;background:#0b0d10;
+  font-size:clamp(15px,min(4.3vw,4.2vh),21px);line-height:1.35;user-select:text;-webkit-tap-highlight-color:transparent;
+  padding:max(1em,env(safe-area-inset-top)) max(1em,env(safe-area-inset-right)) max(1em,env(safe-area-inset-bottom)) max(1em,env(safe-area-inset-left))}
+html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.carded #firstrun{display:none}
+#card-in{margin:auto;width:100%;max-width:26em;display:flex;flex-direction:column;gap:1.1em}
+#card-film{position:relative;aspect-ratio:16/9;border-radius:.45em;overflow:hidden;border:1px solid var(--edge);
+  background:radial-gradient(120% 90% at 50% 110%,#3a1210,#0b0d10 70%)}
+#card-film video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+#card-film::after{content:"";position:absolute;inset:auto 0 0;height:.22em;background:linear-gradient(90deg,var(--red) 30%,var(--amber) 30% 46%,transparent 46%)}
+#card h1{margin:0;font-size:2.5em;font-style:italic;font-weight:800;letter-spacing:.02em;line-height:1}
+#card h1::after{content:"";display:block;width:2em;height:.1em;background:var(--red);margin:.22em 0 0}
+#card-line{margin:0;font-size:1.1em;font-weight:600;color:#e1e6eb}
+#card-open{margin:0;padding:.45em .8em .5em;border-left:.24em solid var(--amber);background:rgba(255,200,61,.08);color:var(--amber);font-weight:600}
+#card-buttons{display:flex;flex-direction:column;gap:.55em}
+#card button{font:inherit;cursor:pointer;-webkit-appearance:none;appearance:none}
+#card .act{position:relative;min-height:2.75em;padding:.5em 1em .5em 1.3em;text-align:left;font-size:1.08em;font-weight:700;letter-spacing:.02em;
+  color:var(--ink);background:rgba(255,255,255,.08);border:1px solid var(--edge);border-radius:.3em}
+#card .act.first{color:#0b0d10;background:#fff;border-color:#fff}
+#card .act.first::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.3em;background:var(--red);border-radius:.3em 0 0 .3em}
+#card .act.done{color:var(--green);border-color:var(--green)}
+#card-anyway{align-self:flex-start;justify-self:start;padding:.3em 0;font-size:.82em!important;font-weight:500;color:var(--dim);background:none;border:0;text-decoration:underline;text-underline-offset:.2em}
+#card-anyway small{font-size:1em;opacity:.8}
+@media (min-aspect-ratio:5/4){
+  #card-in{max-width:min(58em,100%);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:center;gap:.7em 1.6em}
+  #card-buttons{gap:.45em}#card .act{min-height:2.5em}
+  #card-film{grid-column:1;grid-row:1 / span 6}#card-in>:not(#card-film){grid-column:2}
+  #card h1{font-size:2.1em}
+}
+</style>
+</head><body data-screen="loading" data-mode="demo">
+<div id="card" role="dialog" aria-labelledby="card-title">
+  <div id="card-in">
+    <div id="card-film"><video id="card-clip" muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback aria-hidden="true"></video></div>
+    <h1 id="card-title">Tachyon Sprint</h1>
+    <p id="card-line">Built for a keyboard and a big screen. Play it on a computer.</p>
+    <p id="card-open" hidden></p>
+    <div id="card-buttons">
+      <button class="act first" id="card-send">Send the link to my computer</button>
+      <button class="act" id="card-copy">Copy link</button>
+    </div>
+    <button id="card-anyway">Try it here anyway <small>· a large download</small></button>
+  </div>
+</div>
+<div id="wrap"><canvas id="car"></canvas></div>
+
+<div id="hud">
+  <div id="standing" class="block">
+    <div id="place-box" class="race-only"><span class="tag">Place</span><span class="big"><span id="place"></span><small id="of"></small></span></div>
+    <div id="trial-box" class="trial-only"><span class="tag">Time trial</span><span id="target" data-kind="none"></span><span id="ghost"></span></div>
+    <div><span class="tag">Lap</span><span class="big"><span id="lap"></span><small id="laps"></small></span></div>
+  </div>
+  <div id="order" class="race-only">
+    <div id="tower"></div>
+    <div id="gaps"><div><span class="tag">Ahead</span><span id="gap-ahead" data-kind="none"></span></div><div><span class="tag">Behind</span><span id="gap-behind" data-kind="none"></span></div></div>
+  </div>
+  <div id="top">
+    <div id="lights" data-on="no"></div>
+    <div id="wrong" hidden>WRONG WAY</div>
+    <div id="messages"></div>
+  </div>
+  <div id="timing" class="block">
+    <div class="row now"><span class="tag">Time</span><span id="time"></span></div>
+    <span id="delta" data-kind="none"></span>
+    <div class="row"><span class="tag">Last</span><span id="last"></span></div>
+    <div class="row"><span class="tag">Best</span><span id="best"></span></div>
+    <div class="row race-only" id="pen-row" hidden><span class="tag">Penalty <em id="pen-why"></em></span><span id="pen"></span></div>
+    <div id="sectors"><div><b>S1</b><span id="s1"></span></div><div><b>S2</b><span id="s2"></span></div><div><b>S3</b><span id="s3"></span></div></div>
+  </div>
+  <div id="dash" class="block">
+    <div id="leds"></div>
+    <div id="dial">
+      <div><div id="gear-box"><span id="gear" class="big"></span></div><span class="tag">Gear</span></div>
+      <div id="speed-box"><div id="speed" class="big"></div><span class="tag" id="unit"></span></div>
+    </div>
+    <div id="revs"><div id="revs-fill"></div><div id="revs-red"></div></div>
+    <div id="revs-row"><span class="tag">Revs × 1000</span><span class="tag" id="rpm"></span></div>
+  </div>
+  <div id="map" class="block"><svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"><path id="map-road"/><path id="map-line"/><g id="map-cars"></g><circle id="map-other" r="3.4"/><circle id="map-me" r="3.8"/></svg></div>
+  <div id="wayback" hidden><span id="way-back"><kbd id="way-key">R</kbd> back on the road</span><span id="way-reverse">hold <kbd id="way-brake">S</kbd> to reverse</span></div>
+  <div id="damage" class="block" hidden>
+    <span class="tag">Damage</span>
+    <svg id="damage-svg" viewBox="-1.4 -2.85 2.8 5.6" preserveAspectRatio="xMidYMid meet">
+      <rect class="tyre" x="-1.12" y="-1.87" width=".3" height=".76" rx=".08"/><rect class="tyre" x=".82" y="-1.87" width=".3" height=".76" rx=".08"/>
+      <rect class="tyre" x="-1.13" y=".93" width=".32" height=".78" rx=".08"/><rect class="tyre" x=".81" y=".93" width=".32" height=".78" rx=".08"/>
+      <path id="damage-car" d="M-.62-2.35h1.24q.36 0 .36.5v3.6q0 .5-.3.5h-1.36q-.3 0-.3-.5v-3.6q0-.5.36-.5z"/>
+      <path class="glass" d="M-.6-.75q.6-.3 1.2 0l-.12.7h-.96zM-.55.95h1.1l.1.5q-.65.22-1.3 0z"/>
+      <path class="wing" d="M-.95 2.42h1.9"/>
+      <g id="damage-marks"></g>
+    </svg>
+    <span class="tag" id="worn"></span>
+  </div>
+  <button id="pause-button">PAUSE <span class="for-keys">· ESC</span><span class="for-pad">· START</span></button>
+  <div id="readout"></div>
+</div>
+<div id="notice" hidden></div>
+<div id="fps"></div>
+<div id="near-left" class="near" data-side="left" data-kind="none"></div>
+<div id="near-right" class="near" data-side="right" data-kind="none"></div>
+<div id="firstrun" hidden></div>
+
+<div id="menu" hidden></div>
+<div id="note">
+  <div id="wait-back"></div>
+  <section>
+    <div id="wait-stage">Downloading the game</div>
+    <div class="bar"><i id="wait-bar"></i></div>
+    <div class="tag" id="wait-detail">&nbsp;</div>
+    <div id="wait-calm" hidden></div>
+  </section>
+  <section id="warmup">
+    <p id="warm-says">Warm up while it loads: the race starts under these lights. Press Space when they go out.</p>
+    <div class="lights" id="warm-lights"><i></i><i></i><i></i><i></i><i></i></div>
+    <div id="warm-read"></div>
+    <div class="tag" id="warm-best"></div>
+  </section>
+  <section id="wait-tip"></section>
+</div>
+<script>
+// The warm-up (V11, 2026-11-22): the race's own start lights on the loading screen, while the
+// page's thread is free (the files downloading). Five come on, one a second apart after the first
+// (0.8 s, as in a race), hold half a second to two, and go out; Space, a click or a tap reads the
+// reaction from the frame they went out in. A press while any is lit is a jump start; a try in
+// which a frame took over 100 ms from the fifth light on is not counted (the page was busy). It
+// stands down when the warm-up lap begins (the mark `lap-begun`), and is gone with
+// the loading screen: its listeners, timers and frames all stop, and `race_warmup` is counted once.
+// The backdrop and the tips are here too. Plain script, no file of its own.
+(() => {
+  // What is being waited for, behind it: the clip if there is one, its still as the poster and for
+  // when it has not come. Asked for when the program has been (DOMContentLoaded comes after the
+  // module script has asked), at low priority; the clip is paused when the program starts.
+  const BACKDROP = { still: 'wait.jpg', clip: 'assets/card/drive.mp4' };
+  const TIPS = [
+    'W or ↑ drives, S or ↓ brakes and reverses, A and D or ← and → steer.',
+    'Space is the handbrake. Escape pauses.',
+    'R puts you back on the road.',
+    'C changes the view: four of them, from far behind to the bumper.',
+    'Qualify for a grid place by your time, or race now from fifth.',
+    'After the Sweep, 520 m of straight into the Hairpin: the tightest corner of the lap.',
+    'Turn 1, the Esses, the Sweep, the Hairpin, the Chicane, then Turns 6, 7 and 8.',
+    'Seven rivals in the same car: places are won on the brakes and the line.',
+    'Time trial: flying laps against the ghost of your best, for gold, silver or bronze.',
+    'A gamepad works too: press any button on it.',
+    'M turns the sound off and on; F fills the screen.',
+  ];
+  const $ = id => document.getElementById(id);
+  const note = $('note'), box = $('warmup'), says = $('warm-says'), read = $('warm-read'), best = $('warm-best');
+  const lamps = [...$('warm-lights').children];
+  const W = window.warmup = { tries: 0, jumps: 0, busy: 0, best: null, ever: null, phase: 'rest', on: true };
+  try { const kept = +localStorage.getItem('race.warmup'); if (kept > 0) W.ever = kept; } catch { /* not kept */ }
+  let timer = 0, frame = 0, plan = null, lit = 0, last = 0, out = 0, stalled = false;
+  const sec = ms => `${(ms / 1000).toFixed(3)} s`;
+  const shown = () => { best.textContent = [W.best != null && `This visit ${sec(W.best)}`, W.ever != null && `Best ever ${sec(W.ever)}`].filter(Boolean).join('  ·  '); };
+  const light = n => { if (n !== lit) { lit = n; lamps.forEach((l, i) => l.classList.toggle('lit', i < n)); } };
+  const say = (text, word = false) => { read.textContent = text; read.dataset.kind = word ? 'word' : ''; };
+  const tick = t => {
+    frame = 0;
+    if (lit === 5 || W.phase === 'out') { if (last && t - last > 100) stalled = true; }
+    last = t;
+    if (W.phase === 'lights') {
+      if (t >= plan.out) { light(0); out = t; W.phase = 'out'; if (t - plan.out > 100) stalled = true; }
+      else light(t < plan.first ? 0 : Math.min(5, 1 + Math.floor((t - plan.first) / 800)));
+    } else if (W.phase === 'out' && t - out > 2500) {
+      W.phase = 'rest';
+      say('Press Space, or click, to light them again.', true);
+      return;
+    }
+    frame = requestAnimationFrame(tick);
+  };
+  const go = () => {
+    clearTimeout(timer);
+    cancelAnimationFrame(frame);
+    const now = performance.now();
+    plan = { first: now + 1000, out: now + 1000 + 4 * 800 + 500 + Math.random() * 1500 };
+    W.phase = 'lights'; stalled = false; last = 0; light(0); say('');
+    frame = requestAnimationFrame(tick);
+  };
+  const again = ms => { W.phase = 'rest'; timer = setTimeout(go, ms); };
+  const press = e => {
+    if (!W.on || window.lastError) return;
+    if (e.type === 'keydown') { if (e.code !== 'Space') return; e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return; }
+    else if (e.button > 0) return;
+    const at = e.timeStamp;
+    if (W.phase === 'lights' && lit > 0) {
+      cancelAnimationFrame(frame); light(0);
+      W.tries++; W.jumps++;
+      say('Jump start: you went before the lights went out. Again.', true);
+      return again(2000);
+    }
+    if (W.phase === 'out') {
+      cancelAnimationFrame(frame);
+      const ms = Math.round(at - out);
+      if (stalled) { W.busy++; say('The page was busy: again.', true); }
+      else if (ms < 100) { W.tries++; say('Under a tenth: a guess, not a reaction. Again.', true); }
+      else {
+        W.tries++;
+        say(sec(ms));
+        if (W.best == null || ms < W.best) W.best = ms;
+        if (W.ever == null || ms < W.ever) { W.ever = ms; try { localStorage.setItem('race.warmup', String(ms)); } catch { /* not kept */ } }
+        shown();
+      }
+      return again(2500);
+    }
+    if (W.phase === 'rest' || (W.phase === 'lights' && lit === 0)) go();
+  };
+  // A visitor shown the card (the head's first script) has none of it until "Try it here anyway".
+  const begin = () => {
+    if (!W.on) return;
+    addEventListener('keydown', press, true);
+    note.addEventListener('pointerdown', press);
+    timer = setTimeout(go, 1200);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', backdrop, { once: true }); else backdrop();
+  };
+  shown();
+
+  // The tips: one line, a new one every seven seconds, from a place chosen by chance.
+  let tip = Math.floor(Math.random() * TIPS.length);
+  const tips = () => { $('wait-tip').textContent = TIPS[tip++ % TIPS.length]; };
+  tips();
+  const turning = setInterval(tips, 7000);
+
+  // The backdrop.
+  let clip = null;
+  const backdrop = () => {
+    const url = name => window.assetUrl ? window.assetUrl(name) : name;
+    const still = new Image();
+    still.fetchPriority = 'low';
+    still.decoding = 'async';
+    still.onload = () => { $('wait-back').style.backgroundImage = `url("${still.src}")`; };
+    still.src = url(BACKDROP.still);
+    if (BACKDROP.clip && W.on) {
+      clip = Object.assign(document.createElement('video'), { muted: true, loop: true, playsInline: true, autoplay: true, preload: 'auto', poster: still.src, src: url(BACKDROP.clip) });
+      clip.setAttribute('muted', '');
+      $('wait-back').append(clip);
+    }
+  };
+  if (window.raceGo) window.raceGo.then(begin); else begin();
+
+  // Standing down: the program has started (the page's thread is the program's from now), or the
+  // page has failed. The lights stay dark; the best stays.
+  W.stop = why => {
+    if (!W.on) return;
+    W.on = false;
+    clearTimeout(timer); cancelAnimationFrame(frame);
+    removeEventListener('keydown', press, true);
+    note.removeEventListener('pointerdown', press);
+    light(0);
+    box.classList.add('off');
+    says.textContent = why;
+    if (W.phase === 'out' || W.phase === 'lights') say('');
+    W.phase = 'off';
+    try { clip?.pause(); } catch { /* as it is */ }
+  };
+  // The driver, 2026-11-22: on a slow line the circuit's download is most of the wait, and the
+  // program is already running through it; the lights stay until the warm-up lap begins (a try
+  // spoilt by a busy frame is not counted, as above).
+  const marked = () => performance.getEntriesByName('lap-begun', 'mark').length > 0;
+  const standDown = () => W.stop('The track is warming up, so the lights wait for the race: you will see them again on the grid.');
+  try { new PerformanceObserver((l, o) => { if (marked()) { o.disconnect(); standDown(); } }).observe({ type: 'mark' }); } catch { /* the program's start is seen below */ }
+  // Gone with the loading screen: counted once (`race-count`; the counter's listener is set up by
+  // the last script, long before the title), and nothing left running.
+  const ended = new MutationObserver(() => {
+    if (document.body.dataset.screen === 'loading') return;
+    ended.disconnect();
+    W.stop('');
+    clearInterval(turning);
+    if (clip) { clip.removeAttribute('src'); clip.load(); clip.remove(); }
+    document.dispatchEvent(new CustomEvent('race-count', { detail: { event: 'race_warmup', tries: W.tries, jumps: W.jumps, best_ms: W.best ?? 0 } }));
+  });
+  ended.observe(document.body, { attributes: true, attributeFilter: ['data-screen'] });
+  document.addEventListener('race-error', () => W.stop(''));
+})();
+</script>
+
+<script src="probe.js"></script>
+<script src="config.js"></script>
+<script>
+// The card (the script at the top of the head chose who sees it). Its film and the film's first
+// frame are asked for here only, so no one else fetches them. Counted through `race-count`
+// (the counter at the end of the page): race_card {kind} once it shows, race_card_act {act}.
+(() => {
+  const kind = window.raceCard;
+  if (!kind) return;
+  const $ = id => document.getElementById(id);
+  const LINK = 'https://satyam-fp.github.io/race/';
+  const count = (event, more) => document.dispatchEvent(new CustomEvent('race-count', { detail: { event, ...more } }));
+  if (kind === 'nowebgpu') $('card-line').textContent = 'This browser cannot draw the game. Open it in Chrome or Edge on a computer.';
+  if (kind === 'inapp') {
+    const app = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook' }[window.raceDevice().inapp] ?? 'this app';
+    $('card-open').textContent = `Or open it in your phone's own browser: in ${app}, tap the ··· menu and choose "Open in browser".`;
+    $('card-open').hidden = false;
+  }
+  if (kind === 'nowebgpu') $('card-anyway').querySelector('small').remove();
+  const clip = $('card-clip');
+  try {
+    clip.poster = window.assetUrl('assets/card/drive.jpg');
+    clip.src = window.assetUrl('assets/card/drive.mp4');
+    clip.play?.()?.catch?.(() => { /* a saver mode: the poster stays */ });
+  } catch { /* the panel without its film */ }
+  clip.addEventListener('error', () => clip.removeAttribute('src'), { once: true });
+
+  const say = (button, words) => {
+    const was = button.dataset.was ??= button.textContent;
+    button.textContent = words;
+    button.classList.add('done');
+    clearTimeout(button.timer);
+    button.timer = setTimeout(() => { button.textContent = was; button.classList.remove('done'); }, 2500);
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(LINK); return true; } catch { /* the old way */ }
+    try {
+      const t = Object.assign(document.createElement('textarea'), { value: LINK });
+      t.setAttribute('readonly', '');
+      t.style.cssText = 'position:fixed;opacity:0';
+      document.body.append(t);
+      t.select();
+      const done = document.execCommand('copy');
+      t.remove();
+      return done;
+    } catch { return false; }
+  };
+  $('card-send').addEventListener('click', async () => {
+    count('race_card_act', { act: 'send', kind });
+    const text = 'Tachyon Sprint: a racing game for a computer with a keyboard. Open this there:';
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Tachyon Sprint', text, url: LINK }); return; }
+      catch (e) { if (e?.name === 'AbortError') return; /* refused here: the mail below */ }
+    }
+    // A mail to oneself: the mail program opens with the link written in.
+    const mail = document.createElement('a');
+    mail.href = `mailto:?subject=${encodeURIComponent('Tachyon Sprint, for my computer')}&body=${encodeURIComponent(`${text}\n${LINK}`)}`;
+    document.body.append(mail);
+    mail.click();
+    mail.remove();
+  });
+  $('card-copy').addEventListener('click', async () => {
+    count('race_card_act', { act: 'copy', kind });
+    say($('card-copy'), await copy() ? 'Copied' : LINK);
+  });
+  $('card-anyway').addEventListener('click', () => {
+    count('race_card_act', { act: 'anyway', kind });
+    clip.pause();
+    clip.removeAttribute('src');
+    clip.load();
+    window.raceAnyway();
+  });
+  // The counter is the page's last script: told once it has run.
+  document.addEventListener('DOMContentLoaded', () => count('race_card', { kind }), { once: true });
+})();
+</script>
+<script type="module">
+const note = document.getElementById('note');
+const log = console.log, info = console.info;
+const seen = (...a) => { const m = a.join(' ').match(/frame_ms ([0-9.]+)/); if (m) window.frameMs = +m[1]; };
+console.log = (...a) => { seen(...a); log(...a); }; console.info = (...a) => { seen(...a); info(...a); };
+const failed = why => { window.lastError = String(why); note.textContent = String(why); document.body.dataset.screen = 'loading';
+  document.dispatchEvent(new CustomEvent('race-error', { detail: String(why) })); };
+window.addEventListener('error', e => { window.lastError = String(e.message); });
+// The page's scripts and the program come from where `config.js` says.
+// The program is asked for first and compiled as it comes, beside the
+// scripts; the marks are for a profile of a first visit (`tools/firstvisit.mjs`).
+const at = window.assetUrl;
+// (A script is asked for by a whole address: a bare name is not one.)
+const from = name => new URL(at(name), document.baseURI).href;
+// A visitor shown the card (the head's first script) asks for nothing until "Try it here anyway".
+if (window.raceGo) await window.raceGo;
+// (Its bytes are not counted as they come: a response read by the page, or made again, is not
+// one the browser keeps the compiled program of, and a later visit would compile it again.)
+const program = navigator.gpu ? WebAssembly.compileStreaming(fetch('car_bg.wasm')) : null;
+program?.then(() => performance.mark('wasm-compiled'), () => {});
+// A release names the files the title waits for (`config.js`'s `first`, largest
+// first): ask for them as soon as the program's last byte has come (the line is
+// the program's until then), not when Bevy asks two to four seconds later. Each
+// is asked as the game will ask (CORS, no credentials), so the game's own
+// `fetch` is answered by it and nothing comes twice.
+if (program && window.TACHYON.first?.length) {
+  let asked = false;
+  const ask = () => {
+    if (asked) return;
+    asked = true;
+    performance.mark('first-asked');
+    for (const name of window.TACHYON.first) {
+      const link = document.createElement('link');
+      // Low: what the program asks for itself goes ahead of them.
+      Object.assign(link, { rel: 'preload', as: 'fetch', crossOrigin: 'anonymous', fetchPriority: 'low', href: window.TACHYON.base + name });
+      document.head.append(link);
+    }
+  };
+  const wasm = at('car_bg.wasm');
+  const came = () => performance.getEntriesByType('resource').some(e => e.name.endsWith(wasm) && e.responseEnd > 0);
+  try { new PerformanceObserver((l, o) => { if (came()) { o.disconnect(); ask(); } }).observe({ type: 'resource' }); } catch {}
+  if (came()) ask();
+  program.then(ask, ask);
+}
+const [, , car] = await Promise.all([
+  import(from('sound.js')).then(() => import(from('game.js'))),
+  null,
+  import(from('car.js')),
+]);
+performance.mark('scripts-run');
+if (!program) failed('This browser has no WebGPU, which the game is drawn with.');
+// From here the page's thread is the program's: the warm-up stands down at this mark.
+else program.then(module => { performance.mark('program-start'); return car.default({ module_or_path: module }); })
+  .catch(e => { if (!String(e).includes('Using exceptions for control flow')) failed(e); });
+</script><script>
+// Counts players, namelessly (PostHog), and what their machines do. Only on the public address,
+// or with ?count=1 (marked `test`); never under a test's browser (`navigator.webdriver`) unless
+// forced. It loads nothing and sends a handful of small messages a visit; every part is in `try`,
+// so a blocked or broken message changes nothing in the game. Events (README, "Counting players"):
+//   race_opened     returning (race.player was already kept), from, wide, high, and the machine:
+//                   mobile, touch, os, browser, inapp, cores, memory_gb, dpr, screen, network, webgpu
+//   race_title      returning, the machine again with the GPU (from the adapter `game.js` already
+//                   asked for: game.detail.gpu) and its facts (below), and loading: load_s, mb, files,
+//                   cached; detail, detail_asked, scale; the loading's stages (below)
+//   race_started    mode, a drive begun (not the title's demo)
+//   race_drive_end  a drive left for anything but its pause (a result, the menu, a restart):
+//                   mode, laps, finished, and the frames (below)
+//   race_finished   mode, place, and the frames
+//   race_left       the page hidden or closed, once (sendBeacon): screen, titled, drove, and the frames if
+//                   driving; before the title, where the loading was (below)
+//   race_error      the first page error, unhandled rejection, "cannot start" message or lost GPU: what,
+//                   screen, panic (the program's last console.error, a panic's own words), the GPU's
+//                   facts, gpu_lost and gpu_error; before the title, where the loading was (below)
+//   race_shared     how, from (sent by game.js through a `race-count` event)
+//   race_card       kind (phone, inapp, nowebgpu): the card shown instead of the game (the page's own
+//                   script, through `race-count`); race_card_act: act (send, copy, anyway), kind
+// Every message has game, version (v0, v1, v2 from the address, else dev) and seconds since the
+// page opened. Frames are timed here, with requestAnimationFrame, only while the screen is `drive`
+// and the page is shown: each frame one subtraction and one count in a fixed histogram of quarter
+// milliseconds; from it fps (the middle frame), fps_low (the 95th in a hundred, as a rate), long
+// (the share over 50 ms), frames, drive_s, and Auto's detail, scale and detail_steps (its steps down).
+// The loading's stages, seconds from the page's opening, each when reached (performance marks, the
+// page's and the program's `first::mark`, and the counter's own view of the network): t_scripts (the
+// page's scripts run), t_program (the program's last byte), t_compiled, t_first_frame (Bevy's first
+// frame to the page), t_cars (the cars made), t_lap0 and t_lap1 (the warm-up lap begun and done),
+// t_bytes (the last byte of any file before the title), t_ready (the game says it is whole); the
+// lap's frames as the page's requestAnimationFrame saw them: lap_frames, lap_worst_ms. Before the
+// title (race_left, race_error): stage (the furthest of scripts, program, compiled, first_frame,
+// cars, lap0, lap1, ready; else opened), mb_so_far, files_so_far, mbps (megabytes over the seconds
+// to the last file come; a file still coming, the program most of all, counts nothing yet).
+// The GPU's facts (game.detail.gpu.adapter, the one adapter game.js asked for): features (of bc
+// etc2 astc f32filter timestamp ifi f16), fallback (a software GPU), max_tex2d, max_groups,
+// max_sampled, max_storage, max_colors, max_buffer_mb. The device the program asks for is watched,
+// never changed: requestDevice's own promise is returned, and its lost promise and uncapturederror
+// are only listened to (gpu_lost: reason and message; gpu_error: the first error nobody caught).
+(() => {
+  const ask = new URLSearchParams(location.search);
+  const forced = ask.get('count') === '1';
+  if (!forced && (location.hostname !== 'satyam-fp.github.io' || navigator.webdriver)) return;
+  const CAPTURE = 'https://us.i.posthog.com/i/v0/e/';
+  const fresh = () => crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  let id, returning = false;
+  try { id = localStorage.getItem('race.player'); returning = !!id; if (!id) { id = fresh(); localStorage.setItem('race.player', id); } } catch { id = fresh(); }
+  const version = (location.pathname.match(/\/(v\d+)\//) ?? [0, 'dev'])[1];
+  const round = (x, n = 10) => Math.round(x * n) / n;
+  const seconds = () => round(performance.now() / 1000);
+  let from = '';
+  try { from = document.referrer ? new URL(document.referrer).hostname : ''; } catch { /* no referrer */ }
+  // Plain text (the same JSON): a simple request, no CORS preflight, one round trip. `beacon`
+  // for a closing page: sendBeacon, else the fetch with keepalive.
+  const TEXT = 'text/plain;charset=UTF-8';
+  const send = (event, more = {}, beacon = false) => {
+    try {
+      const body = JSON.stringify({ api_key: 'phc_CAun9nTMtAa6B7tecRUxt2piXvP6Q3LPCddXSDDNKPJy', event, distinct_id: id,
+        properties: { game: 'tachyon-sprint', version, $current_url: location.origin + location.pathname, $process_person_profile: false,
+          seconds: seconds(), ...(forced ? { test: true } : {}), ...more } });
+      let sent = false;
+      if (beacon) try { sent = navigator.sendBeacon?.(CAPTURE, new Blob([body], { type: TEXT })) === true; } catch { /* the fetch below */ }
+      if (!sent) fetch(CAPTURE, { method: 'POST', keepalive: true, headers: { 'Content-Type': TEXT }, body }).catch(() => {});
+    } catch { /* counting never stops the game */ }
+  };
+  const body = document.body;
+  const game = () => window.game ?? {};
+  const clean = (s, n) => String(s ?? '').replace(/[a-z][a-z0-9+.-]*:\/\/[^\s'")]+/gi, url => url.split(/[?#]/)[0].split('/').pop() || 'address')
+    .replace(/\?[^\s'")]*/g, '').slice(0, n);
+
+  // The program's last words: a panic is written to console.error by Bevy's hook
+  // (console_error_panic_hook) before its trap ("unreachable") reaches the page. The last
+  // panic is kept over any later error line; its stack is left out. Only text is kept here.
+  const said = { panic: '', last: '' };
+  try {
+    const write = console.error;
+    console.error = function (...a) {
+      try {
+        const text = a.filter(x => typeof x === 'string' && !/(^|;)\s*(color|font-weight|background)\s*:/.test(x))
+          .join(' ').replace(/%c/g, '').split('\n\nStack:')[0].trim();
+        if (text) { if (/panicked at/.test(text)) said.panic = text.slice(0, 600); else said.last = text.slice(0, 600); }
+      } catch { /* as it is */ }
+      return write.apply(this, a);
+    };
+  } catch { /* no wrapper: no panic words */ }
+
+  // The device the program asks for, listened to and never changed.
+  const gpuSaid = {};
+  try {
+    const adapterProto = window.GPUAdapter?.prototype, asking = adapterProto?.requestDevice;
+    if (asking) adapterProto.requestDevice = function (...a) {
+      const p = asking.apply(this, a);
+      try {
+        p.then(device => {
+          try {
+            device.lost?.then(l => { try {
+              if (l?.reason === 'destroyed' || left) return;   // a closing page's device is not a fault
+              gpuSaid.lost = `${l?.reason ?? ''}: ${clean(l?.message, 120)}`;
+              error(`GPU device lost: ${gpuSaid.lost}`);
+            } catch { /* as it is */ } });
+            device.addEventListener?.('uncapturederror', e => { try { if (!gpuSaid.error) gpuSaid.error = clean(e?.error?.message, 200); } catch { /* as it is */ } });
+          } catch { /* as it is */ }
+        }, () => {});
+      } catch { /* as it is */ }
+      return p;
+    };
+  } catch { /* not watched */ }
+  const gpuFacts = () => {
+    const f = {};
+    try {
+      const a = game().detail?.gpu?.adapter;
+      if (!a) return f;
+      const has = n => { try { return a.features?.has(n); } catch { return false; } };
+      f.features = [['bc', 'texture-compression-bc'], ['etc2', 'texture-compression-etc2'], ['astc', 'texture-compression-astc'],
+        ['f32filter', 'float32-filterable'], ['timestamp', 'timestamp-query'], ['ifi', 'indirect-first-instance'], ['f16', 'shader-f16']]
+        .filter(([, n]) => has(n)).map(([s]) => s).join(' ');
+      f.fallback = !!(a.info?.isFallbackAdapter ?? a.isFallbackAdapter);
+      const l = a.limits;
+      if (l) Object.assign(f, { max_tex2d: l.maxTextureDimension2D, max_groups: l.maxBindGroups, max_sampled: l.maxSampledTexturesPerShaderStage,
+        max_storage: l.maxStorageBuffersPerShaderStage, max_colors: l.maxColorAttachments, max_buffer_mb: Math.round(l.maxBufferSize / 1048576) });
+    } catch { /* what could be read is sent */ }
+    return f;
+  };
+  const gpuWords = () => ({ ...(gpuSaid.lost ? { gpu_lost: gpuSaid.lost } : {}), ...(gpuSaid.error ? { gpu_error: gpuSaid.error } : {}) });
+
+  // The machine: short family names only, never the whole user agent.
+  const machine = () => {
+    const m = {};
+    try {
+      const nav = navigator, ua = nav.userAgent || '', data = nav.userAgentData;
+      const has = q => { try { return matchMedia(q).matches; } catch { return false; } };
+      const device = window.raceDevice(), ipad = device.ipad;   // the head's test, shared with the card
+      m.mobile = device.mobile;
+      m.touch = nav.maxTouchPoints || 0;
+      const platform = data?.platform || '';
+      m.os = /iPhone|iPad|iPod/.test(ua) || ipad ? 'ios' : /Android/.test(platform + ua) ? 'android' : /Chrome ?OS|CrOS/.test(platform + ua) ? 'chromeos'
+        : /Win/.test(platform + ua) ? 'windows' : /mac/i.test(platform + ua) ? 'macos' : /Linux/.test(platform + ua) ? 'linux' : 'other';
+      const brand = data?.brands?.find(b => !/Not.?A.?Brand|^Chromium$/i.test(b.brand)) ?? data?.brands?.find(b => b.brand === 'Chromium');
+      let name = '', major = 0;
+      if (brand) {
+        name = /Chrome/.test(brand.brand) ? 'chrome' : /Edge/.test(brand.brand) ? 'edge' : /Opera/.test(brand.brand) ? 'opera' : brand.brand.toLowerCase().replace(/[^a-z]/g, '').slice(0, 16);
+        major = parseInt(brand.version, 10) || 0;
+      } else {
+        const tests = [['edge', /Edg(?:A|iOS)?\/(\d+)/], ['opera', /OPR\/(\d+)/], ['samsung', /SamsungBrowser\/(\d+)/], ['firefox', /(?:Firefox|FxiOS)\/(\d+)/],
+          ['chrome', /(?:Chrome|CriOS)\/(\d+)/], ['safari', /Version\/(\d+).*Safari/]];
+        for (const [n, re] of tests) { const hit = ua.match(re); if (hit) { name = n; major = +hit[1]; break; } }
+        if (!name) name = /AppleWebKit/.test(ua) ? 'webkit' : 'other';
+      }
+      m.browser = name;
+      m.browser_v = major;
+      if (device.inapp) m.inapp = device.inapp;
+      m.cores = nav.hardwareConcurrency || 0;
+      if (nav.deviceMemory) m.memory_gb = nav.deviceMemory;
+      m.dpr = round(devicePixelRatio || 1, 100);
+      m.screen_wide = screen.width;
+      m.screen_high = screen.height;
+      const net = nav.connection;
+      if (net?.effectiveType) m.net = net.effectiveType;
+      if (net?.downlink != null) m.downlink = net.downlink;
+      m.webgpu = 'gpu' in nav;
+    } catch { /* what could be read is sent */ }
+    return m;
+  };
+
+  // What came over the network before the title (the game's own observer does the same).
+  // `end`: the last byte of any file so far; `program`: the program's (responseEnd is given
+  // for a file from another origin too), both in milliseconds from the page's opening.
+  const got = { bytes: 0, files: 0, cached: 0, end: 0, program: 0 };
+  let watching = null;
+  const took = list => {
+    for (const e of list) {
+      if (e.name.startsWith(CAPTURE)) continue;
+      got.files++;
+      got.bytes += e.transferSize || 0;
+      // Less over the wire than its body: kept by the browser (0, or a 304's headers). A file
+      // from another origin without Timing-Allow-Origin shows neither and counts as neither.
+      if (e.encodedBodySize && e.transferSize < e.encodedBodySize) got.cached++;
+      if (e.responseEnd > got.end) got.end = e.responseEnd;
+      if (!got.program && /car_bg[^/]*\.wasm$/.test(e.name.split(/[?#]/)[0])) got.program = e.responseEnd;
+    }
+  };
+  try {
+    watching = new PerformanceObserver(list => took(list.getEntries()));
+    watching.observe({ type: 'resource', buffered: true });
+  } catch { /* an old browser: no loading figures */ }
+  const gotNow = () => { try { if (watching) took(watching.takeRecords()); } catch { /* as it is */ } };
+
+  // The loading's stages: the marks the page and the program make, in the order they come.
+  const STAGES = [['scripts', 'scripts-run'], ['program', ''], ['compiled', 'wasm-compiled'], ['first_frame', 'first-frame'],
+    ['cars', 'cars-whole'], ['lap0', 'lap-begun'], ['lap1', 'lap-done'], ['ready', 'ready']];
+  const markAt = name => { try { return performance.getEntriesByName(name, 'mark')[0]?.startTime; } catch { return undefined; } };
+  const stages = () => {
+    const t = {};
+    try {
+      gotNow();
+      for (const [short, name] of STAGES) {
+        const ms = name ? markAt(name) : got.program || undefined;
+        if (ms != null) t[`t_${short}`] = round(ms / 1000);
+      }
+      if (got.end) t.t_bytes = round(got.end / 1000);
+    } catch { /* what could be read is sent */ }
+    return t;
+  };
+  const whereLoading = () => {
+    const w = { stage: 'opened' };
+    try {
+      gotNow();
+      const t = stages();
+      for (const [short] of STAGES) if (t[`t_${short}`] != null) w.stage = short;
+      const mb = got.bytes / 1e6;
+      Object.assign(w, { mb_so_far: round(mb), files_so_far: got.files, mbps: got.end > 0 ? round(mb / (got.end / 1000), 100) : 0 }, t);
+    } catch { /* what could be read is sent */ }
+    return w;
+  };
+  // The warm-up lap's frames as the page sees them: the program marks its two ends; between
+  // them one subtraction a frame.
+  const lap = { on: false, n: 0, worst: 0, last: 0 };
+  const lapTick = now => {
+    if (!lap.on) return;
+    if (lap.last && !document.hidden) { const dt = now - lap.last; lap.n++; if (dt > lap.worst) lap.worst = dt; }
+    lap.last = now;
+    requestAnimationFrame(lapTick);
+  };
+  try {
+    const marks = new PerformanceObserver(list => {
+      for (const e of list.getEntries()) {
+        if (e.name === 'lap-begun' && !lap.on && !lap.n) { lap.on = true; requestAnimationFrame(lapTick); }
+        if (e.name === 'lap-done') { lap.on = false; marks.disconnect(); }
+      }
+    });
+    marks.observe({ type: 'mark', buffered: true });
+  } catch { /* no lap frames */ }
+
+  const detail = () => {
+    const d = game().detail;
+    if (!d) return {};
+    return { detail: d.level, detail_asked: ask.get('quality') || game().settings?.quality || '', scale: round(d.auto, 100) };
+  };
+
+  // Frames: a quarter-millisecond histogram up to 100 ms, and what is over it.
+  const BINS = 400, hist = new Uint32Array(BINS);
+  const drive = { on: false, of: -1, n: 0, long: 0, over: 0, overMs: 0, ms: 0, last: 0, auto: 1, steps: 0, looping: false };
+  const tick = now => {
+    drive.looping = false;
+    if (!drive.on || body.dataset.screen !== 'drive' || document.hidden) { drive.last = 0; return; }
+    const dt = drive.last ? now - drive.last : 0;
+    drive.last = now;
+    if (dt > 0 && dt < 1000) {
+      const bin = (dt * 4) | 0;
+      if (bin < BINS) hist[bin]++; else { drive.over++; drive.overMs += dt; }
+      drive.n++;
+      drive.ms += dt;
+      if (dt > 50) drive.long++;
+      const auto = game().detail?.auto ?? 1;
+      if (auto < drive.auto) drive.steps++;
+      drive.auto = auto;
+    }
+    drive.looping = true;
+    requestAnimationFrame(tick);
+  };
+  const loop = () => { if (!drive.looping && !document.hidden) { drive.looping = true; drive.last = 0; requestAnimationFrame(tick); } };
+  const begin = () => {
+    hist.fill(0);
+    Object.assign(drive, { on: true, of: game().started ?? 0, n: 0, long: 0, over: 0, overMs: 0, ms: 0, auto: game().detail?.auto ?? 1, steps: 0 });
+    loop();
+  };
+  const at = share => {
+    let want = Math.ceil(drive.n * share), seen = 0;
+    for (let b = 0; b < BINS; b++) { seen += hist[b]; if (seen >= want) return (b + 0.5) / 4; }
+    return drive.over ? drive.overMs / drive.over : 100;
+  };
+  const frames = () => {
+    try {
+      if (!drive.n) return { frames: 0, drive_s: 0, ...detail(), detail_steps: drive.steps };
+      return { fps: round(1000 / at(0.5)), fps_low: round(1000 / at(0.95)), long: round(drive.long / drive.n, 1000),
+        frames: drive.n, drive_s: round(drive.ms / 1000), ...detail(), detail_steps: drive.steps };
+    } catch { return {}; }
+  };
+  let last = {};
+  const end = finished => {
+    if (!drive.on) return;
+    drive.on = false;
+    try {
+      const state = game().state ?? {};
+      const laps = finished ? state.laps : Math.max(0, (state.lap ?? 1) - 1);
+      last = frames();
+      send('race_drive_end', { mode: body.dataset.mode, laps: laps ?? 0, finished, ...last });
+    } catch { /* never stops the game */ }
+  };
+
+  send('race_opened', { from, returning, wide: innerWidth, high: innerHeight, ...machine() });
+  // game.js's race_shared {how, from}; the card's race_card {kind} and race_card_act {act, kind};
+  // the loading screen's race_warmup {tries, jumps, best_ms}.
+  document.addEventListener('race-count', ({ detail: { event, ...more } }) => send(event, more));
+
+  // Errors: the first one a visit, with no address or query in it.
+  let erred = false, titled = false, left = false;
+  const error = what => {
+    if (erred) return;
+    try {
+      what = String(what ?? '');
+      if (what.includes('Using exceptions for control flow')) return;   // winit's, not an error
+      erred = true;
+      what = clean(what, 200);
+      // A panic names its file by the path it was built from: the crate's from its own folder on.
+      const words = (said.panic || said.last).replace(/\/[^\s:]*\/registry\/src\/[^/\s]+\//g, '').replace(/\/rustc\/[0-9a-f]+\//g, '')
+        .replace(/\/(Users|home)\/[^/\s]+\//g, '~/');
+      send('race_error', { what, screen: body.dataset.screen ?? '', ...(words ? { panic: clean(words, 300) } : {}),
+        ...gpuFacts(), ...gpuWords(), ...(titled ? {} : whereLoading()) });
+    } catch { /* never stops the game */ }
+  };
+  addEventListener('error', e => error(e.message || e.error));
+  addEventListener('unhandledrejection', e => error(e.reason?.message ?? e.reason));
+  document.addEventListener('race-error', e => error(e.detail));
+
+  let was = body.dataset.screen, drove = false;
+  new MutationObserver(() => {
+    try {
+      const now = body.dataset.screen;
+      // A restart from the pause comes back to `drive` as a new race (game.started counts them).
+      if (now === 'drive' && drive.on && (game().started ?? 0) !== drive.of) end(false);
+      if (now === was) return;
+      if (!titled && was === 'loading') {
+        titled = true;
+        const gpu = game().detail?.gpu ?? {};
+        const cut = s => String(s ?? '').slice(0, 40);
+        const load_s = seconds(), t = stages();
+        lap.on = false;
+        try { watching?.disconnect(); } catch { /* as it is */ }
+        send('race_title', { returning, ...machine(), gpu_vendor: cut(gpu.vendor), gpu_arch: cut(gpu.arch), gpu_device: cut(gpu.device),
+          ...gpuFacts(), ...gpuWords(),
+          load_s, mb: round(got.bytes / 1e6), files: got.files, cached: got.files > 0 && got.cached >= got.files * 0.9, ...detail(),
+          ...t, ...(lap.n ? { lap_frames: lap.n, lap_worst_ms: Math.round(lap.worst) } : {}) });
+      }
+      if (now === 'drive' && !drive.on) { begin(); drove = true; }
+      else if (now === 'drive') loop();
+      // Away from the drive and not to its pause or the pause's own menus: the drive is over.
+      if (drive.on && /^(result|qualified|title|race|trial|loading)$/.test(now)) end(!!(game().state?.finished));
+      // The mode is written a frame after the screen; a drive taken up again from the pause is not a new one.
+      if (now === 'drive' && was !== 'pause') setTimeout(() => { const mode = body.dataset.mode; if (body.dataset.screen === 'drive' && mode !== 'demo') send('race_started', { mode }); }, 1500);
+      if (now === 'result') setTimeout(() => send('race_finished', { mode: body.dataset.mode, place: document.querySelector('.place-big')?.textContent ?? '', ...last }), 500);
+      was = now;
+    } catch { /* never stops the game */ }
+  }).observe(body, { attributes: true, attributeFilter: ['data-screen'] });
+
+  // Leaving: the first of the page hidden or closed (a phone seldom says it closed).
+  const leave = how => {
+    if (left) return;
+    left = true;
+    try {
+      send('race_left', { how, screen: body.dataset.screen ?? '', titled, drove, ...(drive.on ? { mode: body.dataset.mode, ...frames() } : {}),
+        ...(titled ? {} : whereLoading()) }, true);
+    } catch { /* never stops the game */ }
+  };
+  addEventListener('pagehide', () => leave('close'));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) leave('hide'); else loop(); });
+})();
+</script>
+</body></html>
