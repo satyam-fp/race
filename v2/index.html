@@ -19,14 +19,25 @@ window.raceDevice = () => {
   } catch { /* what could be read */ }
   return d;
 };
+// `raceAdapter()`: the one request for the GPU's adapter, shared by this script (no adapter: the
+// card) and game.js (the GPU's maker and facts, `detail.gpu.adapter`). It answers the adapter,
+// `null` when the browser has WebGPU but gives none (Chrome on Linux without WebGPU turned on, a
+// blocked or old graphics driver: the program would die on "Unable to find a GPU!"), or
+// `undefined` when it cannot be asked or no answer has come in 4 s (then the game goes on as before).
+window.raceAdapter = () => window.raceAdapter.asked ??= (async () => {
+  try {
+    const answer = navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null);
+    return await Promise.race([answer, new Promise(wait => setTimeout(wait, 4000))]);
+  } catch { return undefined; }
+})();
 (() => {
   const d = window.raceDevice();
-  // `card`: 'inapp', 'phone', 'nowebgpu', or '' for the game.
+  // `card`: 'inapp', 'phone', 'nowebgpu', or '' for the game; 'noadapter' is decided later (below).
   const card = window.raceCard = d.inapp ? 'inapp' : d.mobile ? 'phone' : !d.webgpu ? 'nowebgpu' : '';
   // The release's links (release.py writes them here): the program, the picture list and the
   // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
   // links in the page would be; a carded visitor gets them only on "Try it here anyway".
-  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.b47084e993.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"}];
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.d8e80cc44d.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"}];
   const lead = () => {
     for (const a of ahead) {
       const link = document.createElement('link');
@@ -34,12 +45,11 @@ window.raceDevice = () => {
       document.head.append(link);
     }
   };
-  if (!card) { lead(); return; }
   const root = document.documentElement, port = document.querySelector('meta[name=viewport]');
-  root.classList.add('carded');
-  port.content += ', viewport-fit=cover';
-  // The page's module waits on this (below); "Try it here anyway" lets it go.
-  window.raceGo = new Promise(go => {
+  // The card shown; the page's module waits on `raceGo` (below), which "Try it here anyway" lets go.
+  const carded = go => {
+    root.classList.add('carded');
+    port.content += ', viewport-fit=cover';
     window.raceAnyway = () => {
       root.classList.remove('carded');
       port.content = port.content.replace(', viewport-fit=cover', '');
@@ -47,7 +57,22 @@ window.raceDevice = () => {
       lead();
       go();
     };
-  });
+  };
+  if (card) { window.raceGo = new Promise(carded); return; }
+  // A computer with WebGPU: the downloads begin at once, and the program starts (the module below)
+  // once the adapter has been answered, milliseconds from now. No adapter: what was asked for is
+  // stopped, once the page has been read whole (stopping sooner would stop the reading), and the
+  // card is shown (its script below, told by `race-card`) as `noadapter`.
+  lead();
+  window.raceGo = window.raceAdapter().then(adapter => adapter !== null || new Promise(go => {
+    const show = () => {
+      try { window.stop(); } catch { /* what has come stays */ }
+      window.raceCard = 'noadapter';
+      carded(go);
+      document.dispatchEvent(new Event('race-card'));
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show, { once: true }); else show();
+  }));
 })();
 </script>
 <style>
@@ -613,6 +638,7 @@ html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.ca
   });
   ended.observe(document.body, { attributes: true, attributeFilter: ['data-screen'] });
   document.addEventListener('race-error', () => W.stop(''));
+  document.addEventListener('race-gpu-lost', () => W.stop(''));   // game.js: the device lost, said above the lights
 })();
 </script>
 
@@ -621,17 +647,31 @@ html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.ca
 // The card (the script at the top of the head chose who sees it). Its film and the film's first
 // frame are asked for here only, so no one else fetches them. Counted through `race-count`
 // (the counter at the end of the page): race_card {kind} once it shows, race_card_act {act}.
+// A computer whose browser has WebGPU but gives no adapter is told later (`race-card`, from the
+// head's first script), with what to try on its system.
 (() => {
-  const kind = window.raceCard;
-  if (!kind) return;
+const card = kind => {
   const $ = id => document.getElementById(id);
-  const LINK = 'https://satyam-fp.github.io/race/';
+  const LINK = window.TACHYON_DEPLOY?.share || location.origin + location.pathname;   // config.js
   const count = (event, more) => document.dispatchEvent(new CustomEvent('race-count', { detail: { event, ...more } }));
   if (kind === 'nowebgpu') $('card-line').textContent = 'This browser cannot draw the game. Open it in Chrome or Edge on a computer.';
   if (kind === 'inapp') {
     const app = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook' }[window.raceDevice().inapp] ?? 'this app';
     $('card-open').textContent = `Or open it in your phone's own browser: in ${app}, tap the ··· menu and choose "Open in browser".`;
     $('card-open').hidden = false;
+  }
+  if (kind === 'noadapter') {
+    let os = '';
+    try { const s = (navigator.userAgentData?.platform || '') + navigator.userAgent; os = /CrOS|Chrome ?OS/.test(s) ? '' : /Win/.test(s) ? 'windows' : /Mac/.test(s) ? 'mac' : /Linux/.test(s) ? 'linux' : ''; } catch { /* the plain words */ }
+    $('card-line').textContent = 'This browser cannot reach your computer\'s graphics, so the game cannot start here.';
+    // Chrome turns WebGPU on for Linux a family of graphics at a time (Intel from version 144, NVIDIA
+    // on Wayland from 147, developer.chrome.com's "What's New in WebGPU"); elsewhere its two flags
+    // (the WebGPU troubleshooting page): words that stay true as more are turned on.
+    $('card-open').textContent = os === 'linux'
+      ? 'On Linux: a current Chrome, with up-to-date graphics drivers. If it still cannot, open chrome://flags, turn on "Unsafe WebGPU Support" and "Vulkan", and restart Chrome.'
+      : `${os === 'mac' ? 'On a Mac: a' : os === 'windows' ? 'On Windows: a' : 'Try a'} current Chrome or Edge with hardware acceleration on (its Settings, under System), and ${os === 'mac' ? 'macOS' : 'the graphics drivers'} up to date.`;
+    $('card-open').hidden = false;
+    $('card-anyway').querySelector('small').textContent = '· it will most likely stop the same way';
   }
   if (kind === 'nowebgpu') $('card-anyway').querySelector('small').remove();
   const clip = $('card-clip');
@@ -688,7 +728,11 @@ html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.ca
     window.raceAnyway();
   });
   // The counter is the page's last script: told once it has run.
-  document.addEventListener('DOMContentLoaded', () => count('race_card', { kind }), { once: true });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => count('race_card', { kind }), { once: true });
+  else count('race_card', { kind });
+};
+if (window.raceCard) card(window.raceCard);
+else document.addEventListener('race-card', () => card(window.raceCard), { once: true });
 })();
 </script>
 <script type="module">
@@ -705,7 +749,8 @@ window.addEventListener('error', e => { window.lastError = String(e.message); })
 const at = window.assetUrl;
 // (A script is asked for by a whole address: a bare name is not one.)
 const from = name => new URL(at(name), document.baseURI).href;
-// A visitor shown the card (the head's first script) asks for nothing until "Try it here anyway".
+// A visitor shown the card (the head's first script) asks for nothing until "Try it here anyway";
+// any other waits here for the adapter's answer (milliseconds; the release's preloads are on their way).
 if (window.raceGo) await window.raceGo;
 // (Its bytes are not counted as they come: a response read by the page, or made again, is not
 // one the browser keeps the compiled program of, and a later visit would compile it again.)
@@ -765,7 +810,7 @@ else program.then(module => { performance.mark('program-start'); return car.defa
 //                   screen, panic (the program's last console.error, a panic's own words), the GPU's
 //                   facts, gpu_lost and gpu_error; before the title, where the loading was (below)
 //   race_shared     how, from (sent by game.js through a `race-count` event)
-//   race_card       kind (phone, inapp, nowebgpu): the card shown instead of the game (the page's own
+//   race_card       kind (phone, inapp, nowebgpu, noadapter): the card shown instead of the game (the page's own
 //                   script, through `race-count`); race_card_act: act (send, copy, anyway), kind
 // Every message has game, version (v0, v1, v2 from the address, else dev) and seconds since the
 // page opened. Frames are timed here, with requestAnimationFrame, only while the screen is `drive`
@@ -789,8 +834,11 @@ else program.then(module => { performance.mark('program-start'); return car.defa
 (() => {
   const ask = new URLSearchParams(location.search);
   const forced = ask.get('count') === '1';
-  if (!forced && (location.hostname !== 'satyam-fp.github.io' || navigator.webdriver)) return;
-  const CAPTURE = 'https://us.i.posthog.com/i/v0/e/';
+  // Where, to whom and with what key: config.js (TACHYON_DEPLOY.count). No key, nothing sent.
+  const deploy = window.TACHYON_DEPLOY?.count ?? {};
+  if (!deploy.key || !deploy.capture) return;
+  if (!forced && (location.hostname !== deploy.host || navigator.webdriver)) return;
+  const CAPTURE = deploy.capture;
   const fresh = () => crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   let id, returning = false;
   try { id = localStorage.getItem('race.player'); returning = !!id; if (!id) { id = fresh(); localStorage.setItem('race.player', id); } } catch { id = fresh(); }
@@ -804,7 +852,7 @@ else program.then(module => { performance.mark('program-start'); return car.defa
   const TEXT = 'text/plain;charset=UTF-8';
   const send = (event, more = {}, beacon = false) => {
     try {
-      const body = JSON.stringify({ api_key: 'phc_CAun9nTMtAa6B7tecRUxt2piXvP6Q3LPCddXSDDNKPJy', event, distinct_id: id,
+      const body = JSON.stringify({ api_key: deploy.key, event, distinct_id: id,
         properties: { game: 'tachyon-sprint', version, $current_url: location.origin + location.pathname, $process_person_profile: false,
           seconds: seconds(), ...(forced ? { test: true } : {}), ...more } });
       let sent = false;
