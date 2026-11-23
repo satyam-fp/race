@@ -37,7 +37,7 @@ window.raceAdapter = () => window.raceAdapter.asked ??= (async () => {
   // The release's links (release.py writes them here): the program, the picture list and the
   // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
   // links in the page would be; a carded visitor gets them only on "Try it here anyway".
-  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.434a6e6de7.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.7445a90aed.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.abd6f3671c.js"}];
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.434a6e6de7.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.037e986d66.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.abd6f3671c.js"}];
   const lead = () => {
     for (const a of ahead) {
       const link = document.createElement('link');
@@ -338,11 +338,21 @@ body:not([data-screen=loading]) #note{display:none}
 #note>section{position:relative;display:grid;gap:.6em;justify-items:center;text-align:center;letter-spacing:.06em;width:min(30em,calc(100vw - 2em))}
 #wait-stage{color:var(--ink);font-weight:600}
 #note .bar{width:22em;max-width:100%;height:.3em;background:rgba(255,255,255,.14)}#note .bar i{display:block;height:100%;width:0;background:var(--red,#e10600);transition:width .2s linear}
-#driver{display:grid;gap:.5em;justify-items:center;margin-top:1.2em;font-size:.8em;letter-spacing:.04em}
-#driver .driver-row{display:flex;gap:.5em;flex-wrap:wrap;justify-content:center}
-#driver input,#driver select,#driver button{font:inherit;color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);padding:.35em .6em;border-radius:3px}
-#driver input{width:9em;text-transform:uppercase}#driver select{max-width:14em}#driver select option{color:#000}
-#driver button{cursor:pointer}#driver #driver-card-go{background:var(--red,#e10600);border-color:transparent}
+/* The driver card (game.js, "the driver and the boards"): a panel of the menus' own rows over a
+   menu, the menu dimmed behind it; asked when the page is free, never on the loading screen. */
+#driver{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:rgba(8,10,14,.6);
+  --m:clamp(12px,min(2.1vh,1.3vw),28px);font-size:var(--m)}
+#driver .panel{width:min(30em,calc(100vw - 2em));max-height:calc(100vh - 2em);overflow:auto;box-sizing:border-box;padding:1.2em 1.4em .9em;outline:none;
+  background:#0b0d10;border:1px solid rgba(255,255,255,.14);border-top:.2em solid var(--red);border-radius:.3em;box-shadow:0 1em 3em rgba(0,0,0,.6)}
+#driver h1{margin:0;font-size:2em;font-style:italic;font-weight:800;letter-spacing:.02em;line-height:1}
+#driver h1::after{content:"";display:block;width:2em;height:.1em;background:var(--red);margin:.22em 0 .3em}
+#driver .driver-says{margin:0 0 .8em;line-height:1.4;color:#e1e6eb;min-height:4.2em}#driver .driver-says.wanting{color:var(--amber)}
+#driver .list{overflow:visible;flex-direction:column}#driver .list .item{flex:none}#driver .turns .value{width:13em}
+#driver .item.go{margin-top:.4em}
+#driver-card-name{font:inherit;font-weight:700;letter-spacing:.08em;text-transform:uppercase;width:8.4em;padding:.05em .4em;color:inherit;cursor:text;
+  background:transparent;border:1px solid transparent;border-bottom:1px dashed currentColor;border-radius:.2em;outline:none}
+#driver-card-name::placeholder{color:#8b949e;font-weight:500}
+#driver-card-name:focus{border-color:var(--red);background:#fff;color:#0b0d10;box-shadow:0 0 0 2px var(--red)}
 table.board{width:100%;border-collapse:collapse;font-size:.85em}table.board td,table.board th{text-align:left;padding:.2em .4em;white-space:nowrap}
 table.board th{color:var(--dim)}table.board tr.you td{color:#fff;background:rgba(225,6,0,.35)}
 #note .bar.busy i{width:30%!important;animation:busy 1.6s ease-in-out infinite alternate;transition:none}
@@ -817,7 +827,8 @@ else program.then(module => { performance.mark('program-start'); return car.defa
 //                   screen, panic (the program's last console.error, a panic's own words), the GPU's
 //                   facts, gpu_lost and gpu_error; before the title, where the loading was (below)
 //   race_shared     how, from (sent by game.js through a `race-count` event)
-//   race_driver     given (true, or false for Skip), country: the driver card (game.js; never the name)
+//   race_driver     given (true, or false for Skip), country: the driver card, over a menu after a lap
+//                   kept for the boards or from the Leaderboard (game.js; never the name)
 //   race_lap_sent   accepted, reason: a lap sent to the leaderboards and the server's answer (game.js)
 //   race_board      scope (world, country, mine): the Leaderboard screen and each page of it (game.js)
 //   race_card       kind (phone, inapp, nowebgpu, noadapter): the card shown instead of the game (the page's own
