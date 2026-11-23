@@ -37,7 +37,7 @@ window.raceAdapter = () => window.raceAdapter.asked ??= (async () => {
   // The release's links (release.py writes them here): the program, the picture list and the
   // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
   // links in the page would be; a carded visitor gets them only on "Try it here anyway".
-  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.294c9af47f.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.d8e80cc44d.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.9840524a3c.js"}];
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/car_bg.20d4e4d2bc.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v2/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/game.8b174dd1d6.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v2/car.abd6f3671c.js"}];
   const lead = () => {
     for (const a of ahead) {
       const link = document.createElement('link');
@@ -338,6 +338,23 @@ body:not([data-screen=loading]) #note{display:none}
 #note>section{position:relative;display:grid;gap:.6em;justify-items:center;text-align:center;letter-spacing:.06em;width:min(30em,calc(100vw - 2em))}
 #wait-stage{color:var(--ink);font-weight:600}
 #note .bar{width:22em;max-width:100%;height:.3em;background:rgba(255,255,255,.14)}#note .bar i{display:block;height:100%;width:0;background:var(--red,#e10600);transition:width .2s linear}
+/* The driver card (game.js, "the driver and the boards"): a panel of the menus' own rows over a
+   menu, the menu dimmed behind it; asked when the page is free, never on the loading screen. */
+#driver{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:rgba(8,10,14,.6);
+  --m:clamp(12px,min(2.1vh,1.3vw),28px);font-size:var(--m)}
+#driver .panel{width:min(30em,calc(100vw - 2em));max-height:calc(100vh - 2em);overflow:auto;box-sizing:border-box;padding:1.2em 1.4em .9em;outline:none;
+  background:#0b0d10;border:1px solid rgba(255,255,255,.14);border-top:.2em solid var(--red);border-radius:.3em;box-shadow:0 1em 3em rgba(0,0,0,.6)}
+#driver h1{margin:0;font-size:2em;font-style:italic;font-weight:800;letter-spacing:.02em;line-height:1}
+#driver h1::after{content:"";display:block;width:2em;height:.1em;background:var(--red);margin:.22em 0 .3em}
+#driver .driver-says{margin:0 0 .8em;line-height:1.4;color:#e1e6eb;min-height:4.2em}#driver .driver-says.wanting{color:var(--amber)}
+#driver .list{overflow:visible;flex-direction:column}#driver .list .item{flex:none}#driver .turns .value{width:13em}
+#driver .item.go{margin-top:.4em}
+#driver-card-name{font:inherit;font-weight:700;letter-spacing:.08em;text-transform:uppercase;width:8.4em;padding:.05em .4em;color:inherit;cursor:text;
+  background:transparent;border:1px solid transparent;border-bottom:1px dashed currentColor;border-radius:.2em;outline:none}
+#driver-card-name::placeholder{color:#8b949e;font-weight:500}
+#driver-card-name:focus{border-color:var(--red);background:#fff;color:#0b0d10;box-shadow:0 0 0 2px var(--red)}
+table.board{width:100%;border-collapse:collapse;font-size:.85em}table.board td,table.board th{text-align:left;padding:.2em .4em;white-space:nowrap}
+table.board th{color:var(--dim)}table.board tr.you td{color:#fff;background:rgba(225,6,0,.35)}
 #note .bar.busy i{width:30%!important;animation:busy 1.6s ease-in-out infinite alternate;transition:none}
 @keyframes busy{from{transform:translateX(0)}to{transform:translateX(233%)}}
 #wait-calm{max-width:26em;font-size:.8em;line-height:1.35;letter-spacing:.03em;color:#c9d0d8}
@@ -546,7 +563,7 @@ html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.ca
   };
   const again = ms => { W.phase = 'rest'; timer = setTimeout(go, ms); };
   const press = e => {
-    if (!W.on || window.lastError) return;
+    if (!W.on || window.lastError || e.target?.closest?.('#driver')) return;
     if (e.type === 'keydown') { if (e.code !== 'Space') return; e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return; }
     else if (e.button > 0) return;
     const at = e.timeStamp;
@@ -810,6 +827,10 @@ else program.then(module => { performance.mark('program-start'); return car.defa
 //                   screen, panic (the program's last console.error, a panic's own words), the GPU's
 //                   facts, gpu_lost and gpu_error; before the title, where the loading was (below)
 //   race_shared     how, from (sent by game.js through a `race-count` event)
+//   race_driver     given (true, or false for Skip), country: the driver card, over a menu after a lap
+//                   kept for the boards or from the Leaderboard (game.js; never the name)
+//   race_lap_sent   accepted, reason: a lap sent to the leaderboards and the server's answer (game.js)
+//   race_board      scope (world, country, mine): the Leaderboard screen and each page of it (game.js)
 //   race_card       kind (phone, inapp, nowebgpu, noadapter): the card shown instead of the game (the page's own
 //                   script, through `race-count`); race_card_act: act (send, copy, anyway), kind
 // Every message has game, version (v0, v1, v2 from the address, else dev) and seconds since the
@@ -826,6 +847,12 @@ else program.then(module => { performance.mark('program-start'); return car.defa
 // title (race_left, race_error): stage (the furthest of scripts, program, compiled, first_frame,
 // cars, lap0, lap1, ready; else opened), mb_so_far, files_so_far, mbps (megabytes over the seconds
 // to the last file come; a file still coming, the program most of all, counts nothing yet).
+// The GPU's work by stage (start, first_frame, cars, lap0, lap1; `after` the title), on race_title
+// and, before the title, race_left and race_error: p_, kb_, gpu_s_, fr_, worst_ms_, gap_s_, block_s_
+// (below, at `GSTAGES`), gpu_top, gpu_desc and shader_model if the adapter says them, visit_n and
+// prev_load_s (this browser's visits, the last one's load_s). After the title, race_left,
+// race_error and race_drive_end carry p_after, kb_after, gpu_s_after: pipelines made after the
+// title (V10 wants none).
 // The GPU's facts (game.detail.gpu.adapter, the one adapter game.js asked for): features (of bc
 // etc2 astc f32filter timestamp ifi f16), fallback (a software GPU), max_tex2d, max_groups,
 // max_sampled, max_storage, max_colors, max_buffer_mb. The device the program asks for is watched,
@@ -915,6 +942,18 @@ else program.then(module => { performance.mark('program-start'); return car.defa
       const l = a.limits;
       if (l) Object.assign(f, { max_tex2d: l.maxTextureDimension2D, max_groups: l.maxBindGroups, max_sampled: l.maxSampledTexturesPerShaderStage,
         max_storage: l.maxStorageBuffersPerShaderStage, max_colors: l.maxColorAttachments, max_buffer_mb: Math.round(l.maxBufferSize / 1048576) });
+    } catch { /* what could be read is sent */ }
+    return f;
+  };
+  // What the adapter says of itself beyond vendor and architecture (Chrome gives a description, and
+  // the Direct3D shader model, only to some; whatever is there).
+  const adapterSays = () => {
+    const f = {};
+    try {
+      const info = game().detail?.gpu?.adapter?.info ?? {};
+      if (info.description) f.gpu_desc = String(info.description).slice(0, 60);
+      if (info.d3dShaderModel) f.shader_model = info.d3dShaderModel;
+      if (info.vkDriverVersion) f.vk_driver = info.vkDriverVersion;
     } catch { /* what could be read is sent */ }
     return f;
   };
@@ -1028,6 +1067,77 @@ else program.then(module => { performance.mark('program-start'); return car.defa
     marks.observe({ type: 'mark', buffered: true });
   } catch { /* no lap frames */ }
 
+  // What the start asks of the GPU (2026-11-23, PLAN.md "Windows takes minutes to start"), by stage
+  // (start, first_frame, cars, lap0, lap1, then after: everything from the title on): p pipelines,
+  // kb their shader modules' WGSL, gpu_s the GPU process's time for them (after each pipeline the
+  // queue's onSubmittedWorkDone is asked, a promise with nothing submitted; the GPU process takes the
+  // page's calls in order, so from one pipeline's answer to the next is that pipeline's compiling,
+  // on Windows Direct3D's), fr frames, worst_ms the longest, gap_s time in frames over 250 ms,
+  // block_s the page's thread blocked (long tasks). GPUDevice's four create*Pipeline* calls and
+  // createShaderModule are wrapped here, before the program starts (this script runs before the
+  // page's module script), each calling the browser's own with the same arguments and returning what
+  // it returned; the program's shader stand-in (`shaders.rs`) wraps them in turn and is unchanged.
+  const GSTAGES = [['first_frame', 'first-frame'], ['cars', 'cars-whole'], ['lap0', 'lap-begun'], ['lap1', 'lap-done'], ['after', 'title']];
+  const gs = {};
+  const G = s => gs[s] ??= { p: 0, kb: 0, gpu: 0, fr: 0, worst: 0, gap: 0, block: 0 };
+  let gstage = 'start', gdone = 0, gframe = 0;
+  const gtop = [];
+  try {
+    G(gstage);
+    new PerformanceObserver(list => { for (const e of list.getEntries()) { const hit = GSTAGES.find(([, n]) => n === e.name); if (hit && !gs[hit[0]]) G(gstage = hit[0]); } })
+      .observe({ type: 'mark', buffered: true });
+    new PerformanceObserver(list => { for (const e of list.getEntries()) G(gstage).block += e.duration; }).observe({ type: 'longtask', buffered: true });
+    const gtick = now => {
+      if (gframe && !document.hidden) { const dt = now - gframe, s = G(gstage); s.fr++; if (dt > s.worst) s.worst = dt; if (dt > 250) s.gap += dt; }
+      gframe = document.hidden ? 0 : now;
+      if (gstage !== 'after') requestAnimationFrame(gtick);
+    };
+    requestAnimationFrame(gtick);
+    const P = window.GPUDevice?.prototype, sizes = new WeakMap();
+    const module = P?.createShaderModule;
+    if (module) P.createShaderModule = function (d) {
+      const m = module.apply(this, arguments);
+      try { sizes.set(m, String(d?.code ?? '').length); } catch { /* as it is */ }
+      return m;
+    };
+    for (const name of ['createRenderPipeline', 'createComputePipeline', 'createRenderPipelineAsync', 'createComputePipelineAsync']) {
+      const real = P?.[name];
+      if (!real) continue;
+      P[name] = function (d) {
+        const r = real.apply(this, arguments);
+        try {
+          const at = performance.now(), s = G(gstage), was = gstage;
+          const kb = ((sizes.get(d?.vertex?.module ?? d?.compute?.module) ?? 0) + (sizes.get(d?.fragment?.module) ?? 0)) / 1000;
+          s.p++;
+          s.kb += kb;
+          this.queue?.onSubmittedWorkDone?.().then(() => {
+            const now = performance.now(), ms = Math.max(0, now - Math.max(gdone, at));
+            gdone = Math.max(gdone, now);
+            G(was).gpu += ms;
+            if (ms > 500 && gtop.length < 400) gtop.push([ms, `${String(d?.label ?? '').replace(/_pipeline$/, '').slice(0, 24)}/${Math.round(kb)}`]);
+          }, () => {});
+        } catch { /* as it is */ }
+        return r;
+      };
+    }
+  } catch { /* not watched */ }
+  const gpuWork = (only = null) => {
+    const f = {};
+    try {
+      for (const [s, v] of Object.entries(gs)) {
+        if (only && s !== only) continue;
+        Object.assign(f, { [`p_${s}`]: v.p, [`kb_${s}`]: Math.round(v.kb), [`gpu_s_${s}`]: round(v.gpu / 1000) });
+        if (s !== 'after') Object.assign(f, { [`fr_${s}`]: v.fr, [`worst_ms_${s}`]: Math.round(v.worst), [`gap_s_${s}`]: round(v.gap / 1000), [`block_s_${s}`]: round(v.block / 1000) });
+      }
+      // The five pipelines the GPU process took longest over (name/KB of WGSL:ms), over half a second each.
+      if (!only && gtop.length) f.gpu_top = [...gtop].sort((a, b) => b[0] - a[0]).slice(0, 5).map(([ms, w]) => `${w}:${Math.round(ms)}`).join(' ');
+    } catch { /* what could be read is sent */ }
+    return f;
+  };
+  // This browser's visits, and the last one's seconds to the title: does a second visit start sooner?
+  let visits = { n: 0, load_s: 0 };
+  try { visits = JSON.parse(localStorage.getItem('race.starts')) ?? visits; } catch { /* not kept */ }
+
   const detail = () => {
     const d = game().detail;
     if (!d) return {};
@@ -1081,7 +1191,7 @@ else program.then(module => { performance.mark('program-start'); return car.defa
       const state = game().state ?? {};
       const laps = finished ? state.laps : Math.max(0, (state.lap ?? 1) - 1);
       last = frames();
-      send('race_drive_end', { mode: body.dataset.mode, laps: laps ?? 0, finished, ...last });
+      send('race_drive_end', { mode: body.dataset.mode, laps: laps ?? 0, finished, ...last, ...gpuWork('after') });
     } catch { /* never stops the game */ }
   };
 
@@ -1103,7 +1213,7 @@ else program.then(module => { performance.mark('program-start'); return car.defa
       const words = (said.panic || said.last).replace(/\/[^\s:]*\/registry\/src\/[^/\s]+\//g, '').replace(/\/rustc\/[0-9a-f]+\//g, '')
         .replace(/\/(Users|home)\/[^/\s]+\//g, '~/');
       send('race_error', { what, screen: body.dataset.screen ?? '', ...(words ? { panic: clean(words, 300) } : {}),
-        ...gpuFacts(), ...gpuWords(), ...(titled ? {} : whereLoading()) });
+        ...gpuFacts(), ...gpuWords(), ...(titled ? {} : whereLoading()), ...gpuWork(titled ? 'after' : null) });
     } catch { /* never stops the game */ }
   };
   addEventListener('error', e => error(e.message || e.error));
@@ -1127,7 +1237,9 @@ else program.then(module => { performance.mark('program-start'); return car.defa
         send('race_title', { returning, ...machine(), gpu_vendor: cut(gpu.vendor), gpu_arch: cut(gpu.arch), gpu_device: cut(gpu.device),
           ...gpuFacts(), ...gpuWords(),
           load_s, mb: round(got.bytes / 1e6), files: got.files, cached: got.files > 0 && got.cached >= got.files * 0.9, ...detail(),
-          ...t, ...(lap.n ? { lap_frames: lap.n, lap_worst_ms: Math.round(lap.worst) } : {}) });
+          ...t, ...(lap.n ? { lap_frames: lap.n, lap_worst_ms: Math.round(lap.worst) } : {}), ...gpuWork(), ...adapterSays(),
+          visit_n: (visits.n || 0) + 1, ...(visits.load_s ? { prev_load_s: visits.load_s } : {}) });
+        try { localStorage.setItem('race.starts', JSON.stringify({ n: (visits.n || 0) + 1, load_s })); } catch { /* not kept */ }
       }
       if (now === 'drive' && !drive.on) { begin(); drove = true; }
       else if (now === 'drive') loop();
@@ -1146,7 +1258,7 @@ else program.then(module => { performance.mark('program-start'); return car.defa
     left = true;
     try {
       send('race_left', { how, screen: body.dataset.screen ?? '', titled, drove, ...(drive.on ? { mode: body.dataset.mode, ...frames() } : {}),
-        ...(titled ? {} : whereLoading()) }, true);
+        ...(titled ? {} : whereLoading()), ...gpuWork(titled ? 'after' : null) }, true);
     } catch { /* never stops the game */ }
   };
   addEventListener('pagehide', () => leave('close'));
