@@ -78,12 +78,12 @@ window.raceShaderFix = code => {
       try {
         if (typeof d?.code === 'string') {
           let code = window.raceShaderFix(d.code);
-          // The cars are drawn twice, depth first and then colour, by two shaders of the game's own
-          // (damage_prepass.wesl, damage.wesl), and the colour is kept only where its depth equals the
-          // first pass's. Safari works the same position out a hair differently in the two, more the
-          // farther from the circuit's middle, and the paint is lost in patches (seen 2026-11-24,
-          // Safari 26.2). `@invariant` on the position in both makes them agree.
-          if (code.includes('fn dent(')) code = code.replace(/@builtin\(position\)\s+(\w+)\s*:\s*vec4<f32>/g, '@builtin(position) @invariant $1: vec4<f32>');
+          // What is drawn twice, depth first and then colour, keeps its colour only where the second
+          // pass's depth equals the first's. Safari works the same position out a hair differently in
+          // the two passes' shaders, more the farther from the circuit's middle: the cars' paint was
+          // lost in patches, and trees, tyre walls and buildings flickered (seen 2026-11-24, Safari
+          // 26.2). `@invariant` on every shader's position makes the passes agree.
+          code = code.replace(/(?<!@invariant\s*)@builtin\(position\)(?!\s*@invariant)(\s+\w+\s*:\s*vec4<f32>)/g, '@builtin(position) @invariant$1');
           if (code !== d.code) { d.code = code; window.raceShaderFix.mended++; }
         }
       } catch { /* handed over as it was */ }
