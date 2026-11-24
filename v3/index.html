@@ -98,7 +98,7 @@ window.raceShaderFix = code => {
   // The release's links (release.py writes them here): the program, the picture list and the
   // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
   // links in the page would be; a carded visitor gets them only on "Try it here anyway".
-  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.967b3e79d8.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.2996074fdb.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.abd6f3671c.js"}];
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.2cce1d7f3b.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.aeac59288b.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.3eec734973.js"}];
   const lead = () => {
     for (const a of ahead) {
       const link = document.createElement('link');
@@ -183,6 +183,7 @@ body[data-mode=race] .trial-only{display:none!important}
 #tower .car i{flex:none;width:.3em;align-self:stretch;background:var(--c)}
 #tower .car u{flex:none;width:1.9em;text-align:right;text-decoration:none;font-size:.8em;font-weight:700;color:var(--dim)}
 #tower .car span{flex:1;padding-left:.5em;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+#tower .car s{flex:none;padding-right:.4em;text-decoration:none;font-size:.7em;letter-spacing:.14em;color:var(--dim)}
 #tower .car em{flex:none;padding-right:.6em;font-style:normal;font-size:.92em;font-variant-numeric:tabular-nums;color:#dfe5ec}
 #tower .car em[data-kind=word]{font-size:.7em;letter-spacing:.14em;color:var(--dim)}
 #tower .car.you{background:#f4f6f8;color:#0b0d10;z-index:1}
@@ -295,6 +296,25 @@ html.clean #fps{display:none!important}
 #readout{display:none;position:absolute;left:1.6em;bottom:1.5em;padding:.5em .8em;font:11px/1.5 ui-monospace,Menlo,monospace;white-space:pre;background:var(--panel);border-radius:.3em}
 body.readout #readout{display:block}
 
+/* The track: its picture in a note, and the pad a track is drawn on (issue #3). */
+.track-picture{display:block;width:100%;max-height:13em;margin:0 0 .6em;background:rgba(22,48,30,.6);border-radius:.3em}
+.track-picture.small{max-height:6.5em;flex:0 1 auto;min-height:0}
+.track-picture .road{fill:none;stroke:#e9edf1;stroke-width:2.6;stroke-linejoin:round}
+.track-picture .line{stroke:var(--red);stroke-width:2}.track-picture .arrow{fill:none;stroke:var(--red);stroke-width:1.6;stroke-linejoin:round}
+#draw{position:fixed;inset:0;z-index:4;display:grid;place-items:center;background:rgba(8,10,14,.92);font-size:clamp(12px,min(2.1vh,1.3vw),28px)}
+#draw[hidden]{display:none}
+#draw .draw-card{width:min(64em,calc(100vw - 2em));display:grid;gap:.6em}
+#draw h1{margin:0;font-size:2.3em;font-style:italic;font-weight:800;line-height:1}
+#draw h1::after{content:"";display:block;width:2em;height:.1em;background:var(--red);margin:.22em 0 .3em}
+#draw .lead{margin:0}
+#draw-pad{display:block;width:min(100%,99vh);aspect-ratio:2400/1500;cursor:crosshair;touch-action:none;border-radius:.3em;border:1px solid var(--edge);background:#16301e}
+#draw-said{margin:0;min-height:1.4em;line-height:1.4;color:#e1e6eb}
+#draw-said[data-kind=warn]{color:var(--amber)}#draw-said[data-kind=ok]{color:var(--green)}
+#draw-solver{margin:-.4em 0 0;font-size:.9em;line-height:1.4;color:var(--ink);opacity:.75}
+#draw .draw-buttons{display:flex;gap:.6em}
+#draw button{font:inherit;font-weight:700;font-size:1.1em;padding:.4em 1.1em;color:#0b0d10;background:#e9edf1;border:0;border-radius:.25em;cursor:pointer}
+#draw button#draw-race{background:var(--red);color:#fff}#draw button:disabled{opacity:.4;cursor:default}
+#draw button#draw-back{margin-left:auto;background:rgba(255,255,255,.12);color:var(--ink)}
 /* -------------------------------------------------------------- menus */
 /* One frame for every screen (F5 to F13): a panel of one size, in one
    place, whatever is chosen; in it the title, the tabs of a screen with
@@ -383,6 +403,62 @@ body:not(.pad) .keys .for-keys,body:not(.pad) .tab-key .for-keys,body.pad .keys 
 .result tr.you td{background:#fff;color:#0b0d10}.result tr.you td small{color:#3a424d}.result tr.you td i{background:rgba(0,0,0,.08)}
 .result td.fastest{color:var(--violet)}.result tr.you td.fastest{color:#6d2bb3}
 #suggest{margin:0;line-height:1.4;color:#e1e6eb}
+/* Racing friends online: the room's lobby and the panel to create or join
+   one, in the look of the Race Studio's drawer (the multiplayer-drift
+   branch's studio/shared/multiplayer-client.js): its colours, buttons,
+   rows, tags, chat and notices. The panel lies across the card, its
+   choices in a row under it, as on the results; nothing in it under 12 px
+   (F13). */
+body[data-screen=lobby] .main,body[data-screen=rooms] .main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:.8em}
+body[data-screen=lobby] .list,body[data-screen=rooms] .list{grid-row:2;flex-direction:row}
+body[data-screen=lobby] .list .item,body[data-screen=rooms] .list .item{flex:1 1 0;min-width:0}
+.mp{--t:max(12px,.82em);font-size:var(--t);line-height:1.35;color:#f1f5f9;min-height:0;height:100%;box-sizing:border-box}
+.mp-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.1em}
+.mp-col{display:flex;flex-direction:column;min-height:0;overflow-y:auto}
+.mp-join{max-width:26em;display:flex;flex-direction:column;gap:.5em;overflow-y:auto}
+.mp-status{color:#cbd5e1;margin-bottom:.6em}
+.mp-grid{display:grid;grid-template-columns:minmax(0,1fr) 7.5em;gap:.45em;margin-bottom:.6em}
+.mp-input,.mp-select{width:100%;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#f8fafc;
+  padding:.5em .65em;font:600 var(--t)/1.2 system-ui,sans-serif;min-height:2.2em;outline:none}
+.mp-input:focus,.mp-select:focus{border-color:#facc15;box-shadow:0 0 0 1px #facc15}
+#mp-name,.mp-code-input{text-transform:uppercase;letter-spacing:.06em}
+.mp-select option{color:#0b0f17}
+.mp-btn{flex:none;border:none;border-radius:6px;padding:.6em .85em;font:800 var(--t)/1 system-ui,sans-serif;letter-spacing:.05em;cursor:pointer;color:#fff;background:#2563eb;min-height:2.2em}
+.mp-btn:hover{filter:brightness(1.1)}.mp-btn:focus-visible{outline:2px solid #facc15;outline-offset:1px}
+.mp-btn-gold{background:#eab308;color:#0b0f17}.mp-btn-ghost{background:rgba(255,255,255,.1);color:#e2e8f0}.mp-btn-full{width:100%}
+.mp-row-flex{display:flex;gap:.45em;margin-bottom:.6em}.mp-row-flex .mp-input{flex:1 1 auto;min-width:0}
+.mp-room-banner{display:flex;justify-content:space-between;align-items:center;gap:.6em;background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.35);border-radius:7px;padding:.55em .75em;margin-bottom:.6em}
+.mp-sub{letter-spacing:.12em;color:#cbd5e1}
+.mp-code{font:900 max(14px,1.15em)/1.1 ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#facc15;word-break:break-all}
+.mp-roster{display:flex;flex-direction:column;gap:.3em;margin:.2em 0 .4em}
+.mp-player-row{display:grid;grid-template-columns:.75em minmax(0,1fr) auto;align-items:center;gap:.55em;background:rgba(255,255,255,.05);padding:.3em .55em;border-radius:5px}
+.mp-player-row.me{background:rgba(250,204,21,.14)}.mp-player-row.ai{color:#cbd5e1;background:rgba(255,255,255,.025)}
+.mp-pname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.mp-car{display:inline-block;min-width:1.7em;margin-right:.45em;padding:0 .2em;font-style:normal;text-align:center;border-left:.3em solid var(--c);background:rgba(255,255,255,.12)}
+.mp-swatch{width:.75em;height:.75em;border-radius:50%}
+.mp-host,.mp-you{font-style:normal;padding:.05em .4em;border-radius:3px;font-weight:800;margin-left:.3em;text-transform:uppercase;letter-spacing:.04em}
+.mp-host{background:#facc15;color:#0b0f17}.mp-you{background:rgba(255,255,255,.16);color:#f8fafc}
+.mp-pstat{color:#cbd5e1;white-space:nowrap}.mp-pstat.ok{color:#86efac}.mp-pstat.warn{color:#fdba74}
+.mp-note{color:#cbd5e1;margin:.3em 0 0}.mp-note:empty{display:none}
+.mp-mismatch{background:rgba(249,115,22,.16);border:1px solid rgba(249,115,22,.5);border-radius:6px;padding:.55em .75em;margin-bottom:.6em}
+.mp-mismatch .mp-btn{display:block;margin-top:.45em}.mp-mismatch[hidden]{display:none}
+.mp-chat-log{flex:1 1 4em;min-height:3em;overflow-y:auto;background:rgba(0,0,0,.32);border-radius:6px;padding:.45em .6em;margin:0 0 .45em}
+.mp-chat-msg{margin-bottom:.2em;overflow-wrap:anywhere}
+.mp-quick-chips{display:flex;flex-wrap:wrap;gap:.3em;margin:0 0 .45em}
+.mp-chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);color:#e2e8f0;border-radius:99px;padding:.25em .65em;font:600 var(--t)/1.2 system-ui,sans-serif;cursor:pointer}
+.mp-chip:hover{background:rgba(255,255,255,.16)}
+/* A friend's name over their car (N44): the drift branch's tag, a dark chip ringed in the friend's colour with a pointer down to the roof. */
+#mp-tags{position:fixed;inset:0;pointer-events:none;z-index:4;overflow:hidden}
+.mp-tag{position:absolute;left:0;top:0;padding:0 8px;height:20px;line-height:20px;margin-top:-6px;white-space:nowrap;border-radius:5px;
+  background:rgba(10,14,22,.8);border:2px solid var(--c,#facc15);color:#fff;font-weight:800;font-family:"Avenir Next Condensed",system-ui,sans-serif;letter-spacing:.02em;will-change:transform}
+.mp-tag::after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-5px;border:5px solid transparent;border-top:6px solid var(--c,#facc15);border-bottom:0}
+html.carded #mp-tags{display:none}
+.mp-num{font-weight:800;margin-left:.15em}
+.mp-join #mp-name{margin-bottom:.6em}
+#mp-toasts{position:fixed;top:150px;right:22px;z-index:55;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none;max-width:min(26em,60vw)}
+.mp-toast{background:rgba(11,15,22,.88);border:1px solid rgba(255,255,255,.15);border-left:4px solid #facc15;color:#f8fafc;padding:6px 11px;border-radius:5px;
+  font:700 13px/1.3 system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.45);overflow-wrap:anywhere}
+html.carded #mp-toasts{display:none}
 /* A short window: the title and the results drawn tighter. */
 @media (max-height:500px){.card{height:96vh;padding-top:.7em}.card h1{font-size:1.9em}.lead{margin-bottom:.4em}.item{height:2em}.keys{margin-top:.5em;padding-top:.45em}
   .main{gap:.5em 1.4em}.headline{margin-bottom:.2em}.place-big{font-size:1.9em}.result{margin-bottom:.3em}.result td,.result th{padding:0 .4em}#suggest{line-height:1.25}}
@@ -547,6 +623,15 @@ html.carded #hud,html.carded #menu,html.carded #note,html.carded #notice,html.ca
 <div id="firstrun" hidden></div>
 
 <div id="menu" hidden></div>
+<div id="draw" hidden>
+  <div class="draw-card">
+    <header><h1>DRAW A TRACK</h1><p class="lead">One closed loop, drawn the way the cars drive round it. The pad is 2.4 km across: the grid's squares are 100 m.</p></header>
+    <canvas id="draw-pad" aria-label="Draw the track here"></canvas>
+    <p id="draw-said"></p>
+    <p id="draw-solver" hidden></p>
+    <div class="draw-buttons"><button id="draw-clear" type="button">Clear</button><button id="draw-race" type="button" disabled>Race this track</button><button id="draw-back" type="button">Back</button></div>
+  </div>
+</div>
 <div id="note">
   <div id="wait-back"></div>
   <section>
