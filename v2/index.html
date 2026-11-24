@@ -30,6 +30,58 @@ window.raceAdapter = () => window.raceAdapter.asked ??= (async () => {
     return await Promise.race([answer, new Promise(wait => setTimeout(wait, 4000))]);
   } catch { return undefined; }
 })();
+// Safari's WebGPU refuses a texture or sampler held in a `let` ("'texture_2d<f32>' cannot be used as
+// the type of a 'let'"), and the engine's own material shaders do it in 60 of the game's 171 modules
+// (bevy_pbr 0.20.1: `let texture = pbr_bindings::base_color_texture;`), so nothing drawn with them
+// compiles there. For WebKit each shader is rewritten as it is handed to the GPU: such a `let` is
+// dropped and its name, to the end of its block, reads as the texture itself. Lines keep their numbers.
+// `?shaderfix=1` forces it in any browser (the tests), `?shaderfix=0` stops it.
+/*shaderfix*/
+window.raceShaderFix = code => {
+  const handles = new Set();
+  for (const m of code.matchAll(/\bvar\s+(\w+)\s*:\s*(?:texture_|sampler)/g)) handles.add(m[1]);
+  if (!handles.size) return code;
+  const live = [];                       // { name, to, depth }: the last one of a name is the one read
+  const read = name => { for (let i = live.length - 1; i >= 0; i--) if (live[i].name === name) return live[i].to; return name; };
+  let depth = 0, changed = false;
+  const lines = code.split('\n').map(line => {
+    let out = line;
+    const made = line.match(/^\s*(?:let|var|const)\s+(\w+)\s*(?::\s*[\w<>, ]+)?\s*(?:=\s*(\w+)\s*)?;\s*$/);
+    const held = made && /^\s*let\b/.test(line) && made[2] && handles.has(read(made[2])) ? read(made[2]) : '';
+    if (held) { live.push({ name: made[1], to: held, depth }); out = ''; changed = true; }
+    else {
+      const names = new Set(live.map(l => l.name));
+      for (const name of names) {
+        const to = read(name);
+        if (to !== name) out = out.replace(new RegExp(`(?<![.\\w])${name}(?!\\w)`, 'g'), to);
+      }
+      // A name made again inside (not a texture) is its own to the end of that block.
+      if (made && names.has(made[1])) live.push({ name: made[1], to: made[1], depth });
+    }
+    for (const c of line.replace(/\/\/.*$/, '')) {
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; while (live.length && live[live.length - 1].depth > depth) live.pop(); }
+    }
+    return out;
+  });
+  return changed ? lines.join('\n') : code;
+};
+/*shaderfix end*/
+(() => {
+  try {
+    const ua = navigator.userAgent || '', asked = new URLSearchParams(location.search).get('shaderfix');
+    const on = asked === '1' || (asked !== '0' && /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg\/|OPR\//.test(ua));
+    if (!on || !window.GPUDevice) return;
+    const make = GPUDevice.prototype.createShaderModule;
+    window.raceShaderFix.mended = 0;
+    GPUDevice.prototype.createShaderModule = function (d) {
+      try {
+        if (typeof d?.code === 'string') { const code = window.raceShaderFix(d.code); if (code !== d.code) { d.code = code; window.raceShaderFix.mended++; } }
+      } catch { /* handed over as it was */ }
+      return make.call(this, d);
+    };
+  } catch { /* as it was */ }
+})();
 (() => {
   const d = window.raceDevice();
   // `card`: 'inapp', 'phone', 'nowebgpu', or '' for the game; 'noadapter' is decided later (below).
