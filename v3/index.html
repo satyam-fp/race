@@ -98,7 +98,7 @@ window.raceShaderFix = code => {
   // The release's links (release.py writes them here): the program, the picture list and the
   // scripts, asked for at once. Put in from here, at the top of the head, they are as early as
   // links in the page would be; a carded visitor gets them only on "Try it here anyway".
-  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.2cce1d7f3b.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.aeac59288b.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.3eec734973.js"}];
+  const ahead = [{"rel":"preconnect","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/car_bg.31d54ef2fe.wasm"},{"rel":"preload","as":"fetch","crossorigin":"","fetchpriority":"high","href":"https://dwotvqq4zvox.cloudfront.net/v3/assets/bc/list.1bdbd89fe6.txt"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/sound.d595212dbc.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/game.b14d8f5a81.js"},{"rel":"modulepreload","crossorigin":"","href":"https://dwotvqq4zvox.cloudfront.net/v3/car.6739292363.js"}];
   const lead = () => {
     for (const a of ahead) {
       const link = document.createElement('link');
@@ -413,7 +413,7 @@ body[data-screen=lobby] .main,body[data-screen=rooms] .main{grid-template-column
 body[data-screen=lobby] .list,body[data-screen=rooms] .list{grid-row:2;flex-direction:row}
 body[data-screen=lobby] .list .item,body[data-screen=rooms] .list .item{flex:1 1 0;min-width:0}
 .mp{--t:max(12px,.82em);font-size:var(--t);line-height:1.35;color:#f1f5f9;min-height:0;height:100%;box-sizing:border-box}
-.mp-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.1em}
+.mp-cols{display:grid;max-width:46em;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:1.1em}
 .mp-col{display:flex;flex-direction:column;min-height:0;overflow-y:auto}
 .mp-join{max-width:26em;display:flex;flex-direction:column;gap:.5em;overflow-y:auto}
 .mp-status{color:#cbd5e1;margin-bottom:.6em}
@@ -442,7 +442,8 @@ body[data-screen=lobby] .list .item,body[data-screen=rooms] .list .item{flex:1 1
 .mp-note{color:#cbd5e1;margin:.3em 0 0}.mp-note:empty{display:none}
 .mp-mismatch{background:rgba(249,115,22,.16);border:1px solid rgba(249,115,22,.5);border-radius:6px;padding:.55em .75em;margin-bottom:.6em}
 .mp-mismatch .mp-btn{display:block;margin-top:.45em}.mp-mismatch[hidden]{display:none}
-.mp-chat-log{flex:1 1 4em;min-height:3em;overflow-y:auto;background:rgba(0,0,0,.32);border-radius:6px;padding:.45em .6em;margin:0 0 .45em}
+.mp-chat-log{max-height:8em;overflow-y:auto;margin:0 0 .6em;user-select:text}
+.mp-chat-log:empty{display:none}
 .mp-chat-msg{margin-bottom:.2em;overflow-wrap:anywhere}
 .mp-quick-chips{display:flex;flex-wrap:wrap;gap:.3em;margin:0 0 .45em}
 .mp-chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);color:#e2e8f0;border-radius:99px;padding:.25em .65em;font:600 var(--t)/1.2 system-ui,sans-serif;cursor:pointer}
@@ -464,6 +465,10 @@ html.carded #mp-toasts{display:none}
   .main{gap:.5em 1.4em}.headline{margin-bottom:.2em}.place-big{font-size:1.9em}.result{margin-bottom:.3em}.result td,.result th{padding:0 .4em}#suggest{line-height:1.25}}
 /* A tall narrow window: the note under the list. */
 @media (max-aspect-ratio:5/4){.main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 11em}.note{padding:.6em 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.14)}}
+@media (max-width:480px){
+  .mp-cols{grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;overflow-y:auto}
+  .mp-cols .mp-col{overflow:visible}
+}
 /* The loading screen (V11): what is being waited for behind it, darkened; the stage, the bar and
    what is known of the time left; the warm-up (the race's own start lights) under it; a tip. */
 #note{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.3em;color:var(--dim);
